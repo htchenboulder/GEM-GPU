@@ -1,0 +1,19 @@
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@batch2>
+Subject: Job 500948: <gem_test> in cluster <summit> Done
+
+Job <gem_test> was submitted from host <login5> by user <htchen> in cluster <summit> at Mon Jul  8 15:37:34 2019
+Job was executed on host(s) <1*batch2>, in queue <batch>, as user <htchen> in cluster <summit> at Mon Jul  8 15:37:37 2019
+                            <42*h35n12>
+                            <42*h35n13>
+                            <42*h35n14>
+                            <42*h35n16>
+</ccs/home/htchen> was used as the home directory.
+</gpfs/alpine/proj-shared/phy122/htchen/GEM-GPU/test-summit> was used as the working directory.
+Started at Mon Jul  8 15:37:37 2019
+Terminated at Mon Jul  8 15:39:00 2019
+Results reported at Mon Jul  8 15:39:00 2019
+
+The output (if any) is above this job summary.
+
