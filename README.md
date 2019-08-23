@@ -1,2 +1,2 @@
 # GEM-GPU
-GPU version of GEM code
+The GPU version for GEM is undergoing.

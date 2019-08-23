@@ -13,6 +13,10 @@ subroutine ppush(n,ns)
   real :: dbdrp,dbdtp,grcgtp,bfldp,fp,radiusp,dydrp,qhatp,psipp,jfnp,grdgtp
   real :: grp,gxdgyp,rhox(4),rhoy(4),psp,pzp,vncp,vparspp,psip2p,bdcrvbp,curvbzp,dipdrp
   integer :: mynopi
+  !!!temporary array (htc): Fortran stores an array as column major
+  real, dimension(1:mm(ns)) :: x_tmp
+  !$acc declare create(x_tmp)
+  
 
   pidum = 1./(pi*2)**1.5*vwidth**3
   mynopi = 0
@@ -228,6 +232,7 @@ ppush1_start_tm=ppush1_start_tm+MPI_WTIME()
 
   enddo
 !$acc end parallel
+!$acc wait
 ppush1_end_tm=ppush1_end_tm+MPI_WTIME()
 !!$acc update host(w3,x2,x3,y3,z2,z3,u3,w2)
   call MPI_ALLREDUCE(mynopi,nopi(ns),1,MPI_integer, &
@@ -237,65 +242,215 @@ ppush1_end_tm=ppush1_end_tm+MPI_WTIME()
   !$acc update host(z3)
   call init_pmove(z3(ns,:),np_old,lz,ierr)
 
-  !$acc update host(x2) async(1)
-  call pmove(x2(ns,:),np_old,np_new,ierr)
+  !$acc enter data create(x_tmp)
+
+  !$acc kernels present(x2,x_tmp)
+  x_tmp=x2(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(x2) 
-  !$acc update host(x3) async(1)
-  call pmove(x3(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(x2,x_tmp)
+  x2(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(x3,x_tmp)
+  x_tmp=x3(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(x3)
-  !$acc update host(y2) async(1)
-  call pmove(y2(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(x3,x_tmp)
+  x3(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(y2,x_tmp)
+  x_tmp=y2(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(y2)
-  !$acc update host(y3) async(1)
-  call pmove(y3(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(y2,x_tmp)
+  y2(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(y3,x_tmp)
+  x_tmp=y3(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(y3)
-  !$acc update host(z2) async(1)
-  call pmove(z2(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(y3,x_tmp)
+  y3(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(z2,x_tmp)
+  x_tmp=z2(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z2)
-  call pmove(z3(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(z2,x_tmp)
+  z2(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(z3,x_tmp)
+  x_tmp=z3(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z3)
-  !$acc update host(u2) async(1)
-  call pmove(u2(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(z3,x_tmp)
+  z3(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(u2,x_tmp)
+  x_tmp=u2(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u2)
-  !$acc update host(u3) async(1)
-  call pmove(u3(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(u2,x_tmp)
+  u2(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(u3,x_tmp)
+  x_tmp=u3(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u3)
-  !$acc update host(w2) async(1)
-  call pmove(w2(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(u3,x_tmp)
+  u3(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(w2,x_tmp)
+  x_tmp=w2(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(w2)
-  !$acc update host(w3) async(1)
-  call pmove(w3(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(w2,x_tmp)
+  w2(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(w3,x_tmp)
+  x_tmp=w3(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(w3)
-  call pmove(mu(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(w3,x_tmp)
+  w3(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(mu,x_tmp)
+  x_tmp=mu(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(mu)
-  call pmove(xii(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(mu,x_tmp)
+  mu(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(xii,x_tmp)
+  x_tmp=xii(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(xii)
-  call pmove(z0i(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(xii,x_tmp)
+  xii(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(z0i,x_tmp)
+  x_tmp=z0i(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z0i)
-  call pmove(pzi(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(z0i,x_tmp)
+  z0i(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(pzi,x_tmp)
+  x_tmp=pzi(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(pzi)
-  call pmove(eki(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(pzi,x_tmp)
+  pzi(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(eki,x_tmp)
+  x_tmp=eki(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(eki)
-  call pmove(u0i(ns,:),np_old,np_new,ierr)
+  !$acc kernels present(eki,x_tmp)
+  eki(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc kernels present(u0i,x_tmp)
+  x_tmp=u0i(ns,:)
+  !$acc end kernels
+  call test_pmove(x_tmp,np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u0i)
-  !$acc wait(1)
-  !!$acc update device(w3,x2,x3,y2,y3,z2,z3,u2,u3,w2,mu,xii,z0i,pzi,eki,u0i)
+  !$acc kernels present(u0i,x_tmp)
+  u0i(ns,:)=x_tmp
+  !$acc end kernels
+
+  !$acc exit data delete(x_tmp)
+  !$acc update host(x2,x3,y2,y3,z2,z3,u2,u3,w2,w3)
+  
+
+  !!$acc update host(x2) async(1)
+  !call pmove(x2(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(x2) 
+  !!$acc update host(x3) async(1)
+  !call pmove(x3(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(x3)
+  !!$acc update host(y2) async(1)
+  !call pmove(y2(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(y2)
+  !!$acc update host(y3) async(1)
+  !call pmove(y3(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(y3)
+  !!$acc update host(z2) async(1)
+  !call pmove(z2(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(z2)
+  !call pmove(z3(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(z3)
+  !!$acc update host(u2) async(1)
+  !call pmove(u2(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(u2)
+  !!$acc update host(u3) async(1)
+  !call pmove(u3(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(u3)
+  !!$acc update host(w2) async(1)
+  !call pmove(w2(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(w2)
+  !!$acc update host(w3) async(1)
+  !call pmove(w3(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(w3)
+  !call pmove(mu(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(mu)
+  !call pmove(xii(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(xii)
+  !call pmove(z0i(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(z0i)
+  !call pmove(pzi(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(pzi)
+  !call pmove(eki(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(eki)
+  !call pmove(u0i(ns,:),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(u0i)
+  !!$acc wait(1)
+  !!!$acc update device(w3,x2,x3,y2,y3,z2,z3,u2,u3,w2,mu,xii,z0i,pzi,eki,u0i)
   call end_pmove(ierr)
   mm(ns)=np_new
 

@@ -119,6 +119,7 @@ grid11_start_tm=grid11_start_tm+MPI_WTIME()
         enddo
      enddo
 !$acc end parallel
+!$acc wait
 grid11_end_tm=grid11_end_tm+MPI_WTIME()
 
      if(idg.eq.1)write(*,*)myid,'pass ion grid1'

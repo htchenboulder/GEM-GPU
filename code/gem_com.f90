@@ -252,7 +252,7 @@ contains
     allocate( x2(nsmx,1:mmx),y2(nsmx,1:mmx),z2(nsmx,1:mmx),u2(nsmx,1:mmx))
     allocate( x3(nsmx,1:mmx),y3(nsmx,1:mmx),z3(nsmx,1:mmx),u3(nsmx,1:mmx))
     allocate( w2(nsmx,1:mmx),w3(nsmx,1:mmx))
-    !!$acc enter data copyin(x2,y2,z2,u2,x3,y3,z3,w2,w3）
+    !$acc enter data copyin(x2,y2,z2,u2,x3,y3,z3,w2,w3)
 
     allocate( mue(1:mmxe),xie(1:mmxe),pze(1:mmxe),eke(1:mmxe),z0e(1:mmxe),u0e(1:mmxe))
     allocate( x2e(1:mmxe),y2e(1:mmxe),z2e(1:mmxe),u2e(1:mmxe),mue2(1:mmxe))

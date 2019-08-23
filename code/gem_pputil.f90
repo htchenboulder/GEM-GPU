@@ -6,7 +6,8 @@ MODULE gem_pputil
   use openacc
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: ppinit, ppexit, init_pmove, end_pmove, pmove, guard
+  !!!test_pmove is added to test the data locality(htc)
+  PUBLIC :: ppinit, ppexit, init_pmove, end_pmove, pmove, guard,test_pmove
   PUBLIC :: ppsum, ppmax, ppmin
   PUBLIC :: pptransp, ppcfft2
   PUBLIC :: timera, disp
@@ -118,8 +119,8 @@ CONTAINS
     !$acc update host(s_counts,s_displ)
 
 !if(me==0)write(*,*)'init_pmove  xp is_present ', is_present
-is_present=acc_is_present(xp)
-write(*,*)'init_pmove  xp is_present ', is_present,'me=',me
+!is_present=acc_is_present(xp)
+!write(*,*)'init_pmove  xp is_present ', is_present,'me=',me
     
     nsize = sum(s_counts)
     IF( .not. ALLOCATED(s_buf) ) THEN
@@ -127,13 +128,16 @@ write(*,*)'init_pmove  xp is_present ', is_present,'me=',me
        ALLOCATE(s_buf(1:ksize))
        ALLOCATE(ipsend(1:ksize))
        ALLOCATE(iphole(1:ksize))
+       !$acc enter data create(s_buf,ipsend,iphole)
     ELSE IF ( SIZE(s_buf) .LT. nsize ) THEN
+       !$acc exit data delete(s_buf,ipsend,iphole)
        DEALLOCATE(s_buf)
        DEALLOCATE(ipsend)
        DEALLOCATE(iphole)
        ALLOCATE(s_buf(1:nsize))
        ALLOCATE(ipsend(1:nsize))
        ALLOCATE(iphole(1:nsize))
+       !$acc enter data create(s_buf,ipsend,iphole)
     END IF
     !
     !----------------------------------------------------------------------
@@ -195,10 +199,10 @@ write(*,*)'init_pmove  xp is_present ', is_present,'me=',me
     !
   END SUBROUTINE init_pmove
 !===========================================================================
-  SUBROUTINE pmove(xp, np_old, np_new, ierr)
-!
+!!!test data locality (htc)
+  SUBROUTINE test_pmove(xp, np_old, np_new, ierr)
     use mpi
-!
+
     REAL, DIMENSION(:), INTENT(inout) :: xp
     INTEGER, INTENT(in) :: np_old
     INTEGER, INTENT(out) :: np_new
@@ -209,6 +213,7 @@ write(*,*)'init_pmove  xp is_present ', is_present,'me=',me
     INTEGER :: i, ii, ip, iz, ih, isrc
     INTEGER :: nhole, mhole, nrrecv, nrsend, nptot_old, nptot
     INTEGER :: ind, count, tot_count, iwork
+    INTEGER :: is_present
 
 !
 !  Local arrays
@@ -216,11 +221,18 @@ write(*,*)'init_pmove  xp is_present ', is_present,'me=',me
   !!!declare global module arrays on both CPU and GPU (htc)
   !!$acc declare create(s_requ,r_requ,id_source) 
   !!is_present is used to test the data is on device or not, using acc_is_present
-    INTEGER :: isrt, iend, isrt_receive, isrt_send,is_present
+    INTEGER :: isrt, iend, isrt_receive, isrt_send
     INTEGER :: status(MPI_STATUS_SIZE), arr_status(MPI_STATUS_SIZE,nvp)
-!
+
 !  time diagnosis
-   real :: start_tm,end_tm,tottm_1,tottm_2,tottm_3,tottm_4,tottm_5
+    real :: start_tm,end_tm,tottm_1,tottm_2,tottm_3,tottm_4,tottm_5
+!----------------------------------------------------------------------
+!              1.  Fill send buffer
+
+!!!test xp is on device or not (htc)
+!is_present=acc_is_present(xp)
+!write(*,*)'test_pmove  xp is_present ', is_present,'me=',me
+
 !----------------------------------------------------------------------
 !              1.  Fill send buffer
 !
@@ -232,22 +244,23 @@ start_tm=MPI_WTIME()
 !!!xp data already resides on the devices (htc)
 !!!explicit parallelism (htc)
 !!!any scalar accessed within a parallel loop will be made firstprivate by default (htc)
-!$acc data deviceptr(xp)
-!$acc parallel loop 
+!is_present=acc_is_present(s_buf)
+!write(*,*)'test_pmove  s_buf is_present ', is_present,'me=',me
+!is_present=acc_is_present(s_counts)
+!write(*,*)'test_pmove  s_counts is_present ', is_present,'me=',me
     DO i=0,nvp-1
        IF( s_counts(i) .GT. 0 ) THEN
           isrt = s_displ(i)+1
           iend = s_displ(i)+s_counts(i)
+          !!!s_buf without generating present!
+          !$acc kernels present(xp)
           s_buf(isrt:iend) = xp(ipsend(isrt:iend))
+          !$acc end kernels
        END IF
     END DO
-!$acc end parallel
-!$acc end data
 !!!!update host (htc)
 !$acc update host(s_buf)
 
-!is_present=acc_is_present(xp)
-!if(me==0)write(*,*)'pmove part 1 xp is_present ', is_present
 end_tm=MPI_WTIME()
 tottm_1=end_tm-start_tm
 if(me==0)write(*,*)'pmove, part1 ',tottm_1
@@ -284,9 +297,7 @@ start_tm=MPI_WTIME()
     !!$acc end serial 
 end_tm=MPI_WTIME()
 tottm_2=end_tm-start_tm
-!if(me==0)write(*,*)'pmove part2 ',tottm_2
-!if(me==0)write(*,*)'pmove nrrecv', nrrecv
-!if(me==0)write(*,*)'pmove nrsend', nrsend
+if(me==0)write(*,*)'pmove part2 ',tottm_2
 !!!else-endif is useless
 #else
 
@@ -309,7 +320,7 @@ do ii=0,nvp-1
      nrsend=nrsend+1
      isrt_send=s_displ(i)+1
      iend=s_displ(i)+s_counts(i)
-     !!$acc kernels present(s_buf,ipsend,xp)
+     !!$acc kernels present(xp)
      s_buf(isrt_send:iend)=xp(ipsend(isrt_send:iend))
      !!$acc end kernels
      !!$acc update host(s_buf)
@@ -328,18 +339,21 @@ tottm_2=end_tm-start_tm
 start_tm=MPI_WTIME()
     nhole = sum(s_counts)
     ip = np_old
-    !$acc data deviceptr(xp)
-    !$acc kernels
+    !!!this loop should be executed sequentially
+    !$acc kernels present(xp)
     DO ih = nhole, 1, -1
        xp(iphole(ih)) = xp(ip)
        ip = ip-1
     END DO
     !$acc end kernels
-    !$acc end data
 
-
-    np_new = ip
+    !!!the live-out scalar ip will result in accelerator restriction
+    !np_new = ip
+    !!!to avoid live-out scalar
+    np_new = np_old-nhole
+    !ip=np_new
 !
+!if(me==0)write(*,*)'np_old,np_new,nhole ',np_old,np_new,nhole
 end_tm=MPI_WTIME()
 tottm_3=end_tm-start_tm
 if(me==0)write(*,*)'pmove part3 ', tottm_3
@@ -366,11 +380,185 @@ start_tm=MPI_WTIME()
        iend = np_new + tot_count
 
        !$acc update device(r_buf)
-       !$acc data deviceptr(xp) 
-       !$acc kernels
+       !$acc kernels present(xp)
        xp(isrt:iend) = r_buf(1:tot_count)
        !$acc end kernels
-       !$acc end data
+       
+
+       np_new = iend
+    END IF
+
+end_tm=MPI_WTIME()
+tottm_4=end_tm-start_tm
+!if(me==0)write(*,*)'pmove part4 ', tottm_4
+!----------------------------------------------------------------------
+!              5.   Epilogue
+!
+start_tm=MPI_WTIME()
+!... Wait for any non-blocking comm. requests
+    IF( nrsend.gt.0) CALL MPI_WAITALL(nrsend, s_requ, arr_status, ierr)
+!
+!... Check consistency
+    ierr = 0
+    CALL MPI_ALLREDUCE(np_old, nptot_old, 1, MPI_INTEGER,&
+         & MPI_SUM, MPI_COMM_WORLD, ierr)
+    CALL MPI_ALLREDUCE(np_new, nptot, 1, MPI_INTEGER,&
+         & MPI_SUM, MPI_COMM_WORLD, ierr)
+    IF( nptot.ne.nptot_old ) THEN
+       IF(me.eq.0) WRITE(*,*) 'PMOVE: mismatch in total numbers:',&
+            & nptot_old, nptot
+       ierr = 1
+    END IF
+!    call ppsum(ierr)
+end_tm=MPI_WTIME()
+tottm_5=end_tm-start_tm
+!if(me==0)write(*,*)'pmove part5 ', tottm_5
+!----------------------------------------------------------------------!
+  END SUBROUTINE test_pmove
+  SUBROUTINE pmove(xp, np_old, np_new, ierr)
+!
+    use mpi
+!
+    REAL, DIMENSION(:), INTENT(inout) :: xp
+    INTEGER, INTENT(in) :: np_old
+    INTEGER, INTENT(out) :: np_new
+    INTEGER, INTENT(out) :: ierr
+!
+!  Local vars
+    INTEGER :: nsize
+    INTEGER :: i, ii, ip, iz, ih, isrc
+    INTEGER :: nhole, mhole, nrrecv, nrsend, nptot_old, nptot
+    INTEGER :: ind, count, tot_count, iwork
+
+!
+!  Local arrays
+    INTEGER, DIMENSION(1:nvp) :: s_requ, r_requ, id_source
+  !!!declare global module arrays on both CPU and GPU (htc)
+  !!$acc declare create(s_requ,r_requ,id_source) 
+  !!is_present is used to test the data is on device or not, using acc_is_present
+    INTEGER :: isrt, iend, isrt_receive, isrt_send,is_present
+    INTEGER :: status(MPI_STATUS_SIZE), arr_status(MPI_STATUS_SIZE,nvp)
+!
+!  time diagnosis
+   real :: start_tm,end_tm,tottm_1,tottm_2,tottm_3,tottm_4,tottm_5
+!----------------------------------------------------------------------
+!              1.  Fill send buffer
+!
+
+
+start_tm=MPI_WTIME()
+
+#ifndef __PMOVE_DEBUG
+    DO i=0,nvp-1
+       IF( s_counts(i) .GT. 0 ) THEN
+          isrt = s_displ(i)+1
+          iend = s_displ(i)+s_counts(i)
+          s_buf(isrt:iend) = xp(ipsend(isrt:iend))
+       END IF
+    END DO
+end_tm=MPI_WTIME()
+tottm_1=end_tm-start_tm
+if(me==0)write(*,*)'pmove, part1 ',tottm_1
+!----------------------------------------------------------------------
+!              2.   Initiate non-blocking send/receive
+!
+start_tm=MPI_WTIME()
+    pmove_tag = pmove_tag+1
+
+    nrrecv=0             !......... Start non-blocking receive
+    DO i=0,nvp-1
+       IF(r_counts(i) .GT. 0 ) THEN
+          nrrecv=nrrecv+1
+          id_source(nrrecv) = i
+          isrt = r_displ(i)+1
+          CALL MPI_IRECV(r_buf(isrt), r_counts(i), MPI_REAL8,&
+               & i, pmove_tag, TUBE_COMM, r_requ(nrrecv), ierr)
+       END IF
+    END DO
+    nrsend=0             !......... Start non-blocking SYNCHRONOUS send
+    DO i=0,nvp-1
+       IF(s_counts(i) .GT. 0 ) THEN
+          nrsend=nrsend+1
+          isrt = s_displ(i)+1
+          CALL MPI_ISSEND(s_buf(isrt), s_counts(i), MPI_REAL8,&
+               & i, pmove_tag, TUBE_COMM, s_requ(nrsend), ierr)
+       END IF
+    END DO
+end_tm=MPI_WTIME()
+tottm_2=end_tm-start_tm
+!if(me==0)write(*,*)'pmove part2 ',tottm_2
+!if(me==0)write(*,*)'pmove nrrecv', nrrecv
+!if(me==0)write(*,*)'pmove nrsend', nrsend
+!!!else-endif is useless
+#else
+
+pmove_tag=pmove_tag+1
+nrrecv=0
+nrsend=0
+
+do ii=0,nvp-1
+
+   i=mod(ii+me,nvp) 
+   if(r_counts(i) .gt. 0)then
+     nrrecv=nrrecv+1
+     id_source(nrrecv)=i
+     isrt_receive=r_displ(i)+1
+     CALL MPI_IRECV(r_buf(isrt_receive), r_counts(i), MPI_REAL8,&
+               & i, pmove_tag, TUBE_COMM, r_requ(nrrecv), ierr)
+   endif
+
+   if(s_counts(i) .gt. 0)then
+     nrsend=nrsend+1
+     isrt_send=s_displ(i)+1
+     iend=s_displ(i)+s_counts(i)
+     s_buf(isrt_send:iend)=xp(ipsend(isrt_send:iend))
+     CALL MPI_ISSEND(s_buf(isrt_send), s_counts(i), MPI_REAL8,&
+               & i, pmove_tag, TUBE_COMM, s_requ(nrsend), ierr)
+   endif
+enddo
+end_tm=MPI_WTIME()
+tottm_2=end_tm-start_tm
+!if(me==0)write(*,*)'pmove part1, part2 ', tottm_2
+
+#endif
+!----------------------------------------------------------------------
+!              3.   Remove holes and compress part. arrays
+!
+start_tm=MPI_WTIME()
+    nhole = sum(s_counts)
+    ip = np_old
+    DO ih = nhole, 1, -1
+       xp(iphole(ih)) = xp(ip)
+       ip = ip-1
+    END DO
+
+
+    np_new = ip
+!
+end_tm=MPI_WTIME()
+tottm_3=end_tm-start_tm
+if(me==0)write(*,*)'pmove part3 ', tottm_3
+!----------------------------------------------------------------------
+!              4.   Store incoming part. to the part. arrays
+!
+start_tm=MPI_WTIME()
+    tot_count = 0
+    DO i=1,nrrecv
+       CALL MPI_WAITANY(nrrecv, r_requ, ind, status, ierr)
+       isrc = id_source(ind)
+       CALL MPI_GET_COUNT(status, MPI_REAL8, count, ierr)
+       IF( count .ne. r_counts(isrc) ) THEN
+          WRITE(*,*) 'PE',me, '  Counts mismatched from PE',isrc,&
+               & count,  r_counts(isrc)
+       END IF
+       tot_count =  tot_count+count
+    END DO
+!
+    IF( tot_count .GT. 0 ) THEN
+       isrt = np_new + 1
+       iend = np_new + tot_count
+
+       xp(isrt:iend) = r_buf(1:tot_count)
        
 
        np_new = iend
