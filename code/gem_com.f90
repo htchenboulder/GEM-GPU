@@ -247,11 +247,11 @@ contains
     allocate (gn0e(0:nxpp),gt0e(0:nxpp),gt0i(0:nxpp),avap(0:nxpp))
     allocate (gn0s(1:5,0:nxpp))
     !          particle array declarations
-    allocate( mu(nsmx,1:mmx),xii(nsmx,1:mmx),pzi(nsmx,1:mmx), &
-         eki(nsmx,1:mmx),z0i(nsmx,1:mmx),u0i(nsmx,1:mmx))
-    allocate( x2(nsmx,1:mmx),y2(nsmx,1:mmx),z2(nsmx,1:mmx),u2(nsmx,1:mmx))
-    allocate( x3(nsmx,1:mmx),y3(nsmx,1:mmx),z3(nsmx,1:mmx),u3(nsmx,1:mmx))
-    allocate( w2(nsmx,1:mmx),w3(nsmx,1:mmx))
+    allocate( mu(1:mmx,nsmx),xii(1:mmx,nsmx),pzi(1:mmx,nsmx), &
+         eki(1:mmx,nsmx),z0i(1:mmx,nsmx),u0i(1:mmx,nsmx))
+    allocate( x2(1:mmx,nsmx),y2(1:mmx,nsmx),z2(1:mmx,nsmx),u2(1:mmx,nsmx))
+    allocate( x3(1:mmx,nsmx),y3(1:mmx,nsmx),z3(1:mmx,nsmx),u3(1:mmx,nsmx))
+    allocate( w2(1:mmx,nsmx),w3(1:mmx,nsmx))
     !$acc enter data copyin(x2,y2,z2,u2,x3,y3,z3,w2,w3)
 
     allocate( mue(1:mmxe),xie(1:mmxe),pze(1:mmxe),eke(1:mmxe),z0e(1:mmxe),u0e(1:mmxe))

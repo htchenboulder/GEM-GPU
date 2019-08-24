@@ -66,7 +66,7 @@ CONTAINS
     INTEGER, INTENT(out) :: ierr
     !
     !  Local vars
-    INTEGER :: nsize, ksize,is_present
+    INTEGER :: nsize, ksize,is_present,xpsize
     INTEGER :: i, ip, iz, ih, iwork
     REAL :: dzz, xt
     INTEGER, DIMENSION(0:nvp-1) :: isb
@@ -186,7 +186,7 @@ CONTAINS
     !  Check for part. array overflow
     ierr = 0
     nsize = np - sum(s_counts) + sum(r_counts)
-    if( nsize .gt. size(xp) ) then
+    if( nsize .gt. size(xp)) then
        write(*,*) 'PE', me, 'Particle array overflow'
        ierr = 1
     end if

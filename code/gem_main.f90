@@ -626,15 +626,15 @@ subroutine restart(iflag,n)
      do ns = 1,nsm
         read(139+MyId)mm(ns)
         do m=1,mm(ns)
-           read(139+MyId) mu(ns,m)
-           read(139+MyId) x2(ns,m),y2(ns,m),z2(ns,m),u2(ns,m),w2(ns,m)
-           read(139+MyId) xii(ns,m),z0i(ns,m),pzi(ns,m),eki(ns,m),u0i(ns,m)
-           w2(ns,m)=w2(ns,m)/cut
-           x3(ns,m)=x2(ns,m)
-           y3(ns,m)=y2(ns,m)
-           z3(ns,m)=z2(ns,m)
-           u3(ns,m)=u2(ns,m)
-           w3(ns,m)=w2(ns,m)
+           read(139+MyId) mu(m,ns)
+           read(139+MyId) x2(m,ns),y2(m,ns),z2(m,ns),u2(m,ns),w2(m,ns)
+           read(139+MyId) xii(m,ns),z0i(m,ns),pzi(m,ns),eki(m,ns),u0i(m,ns)
+           w2(m,ns)=w2(m,ns)/cut
+           x3(m,ns)=x2(m,ns)
+           y3(m,ns)=y2(m,ns)
+           z3(m,ns)=z2(m,ns)
+           u3(m,ns)=u2(m,ns)
+           w3(m,ns)=w2(m,ns)
         enddo
      end do
 120  continue
@@ -667,9 +667,9 @@ subroutine restart(iflag,n)
      do ns = 1,nsm
         write(139+MyId)mm(ns)
         do m=1,mm(ns)
-           write(139+MyId) mu(ns,m)
-           write(139+MyId) x2(ns,m),y2(ns,m),z2(ns,m),u2(ns,m),w2(ns,m)
-           write(139+MyId) xii(ns,m),z0i(ns,m),pzi(ns,m),eki(ns,m),u0i(ns,m)
+           write(139+MyId) mu(m,ns)
+           write(139+MyId) x2(m,ns),y2(m,ns),z2(m,ns),u2(m,ns),w2(m,ns)
+           write(139+MyId) xii(m,ns),z0i(m,ns),pzi(m,ns),eki(m,ns),u0i(m,ns)
         enddo
      end do
 
@@ -1079,19 +1079,19 @@ subroutine loadi(ns)
      if(ran2(iseed)<(0.5*jacp/jacmax))then
         m = m+1
         if(m>mm(ns))goto 170
-        x2(ns,m)=min(dumx,lx-1e-8)
-        y2(ns,m)=min(dumy,ly-1e-8)
+        x2(m,ns)=min(dumx,lx-1e-8)
+        y2(m,ns)=min(dumy,ly-1e-8)
 
         k = int((th+pi)/dth)
         wz0 = (-pi+(k+1)*dth-th)/dth
         wz1 = 1-wz0
-        z2(ns,m) = wz0*zfnth(k)+wz1*zfnth(k+1)
-        z2(ns,m)=min(z2(ns,m),lz-1e-8)
+        z2(m,ns) = wz0*zfnth(k)+wz1*zfnth(k+1)
+        z2(m,ns)=min(z2(m,ns),lz-1e-8)
 
         call parperp(vpar,vperp2,m,pi,cnt,MyId)
         !   normalizations will be done in following loop...
 
-        r=x2(ns,m)-0.5*lx+lr0
+        r=x2(m,ns)-0.5*lx+lr0
         cost=cos(th)
         i = int((r-rin)/dr)
         wx0 = (rin+(i+1)*dr-r)/dr
@@ -1106,20 +1106,20 @@ subroutine loadi(ns)
         if(ildu==1)ter = tgis(ns)
         b=1.-tor+tor*bfldp
 
-        u2(ns,m)=vpar/sqrt(mims(ns)/ter)
-        mu(ns,m)=0.5*vperp2/b*ter
-        eki(ns,m) = mu(ns,m)*b+0.5*mims(ns)*u2(ns,m)**2
-        pzi(ns,m) = mims(ns)*u2(ns,m)/b-q(ns)*psp/br0
-        z0i(ns,m) = z2(ns,m)
-        xii(ns,m) = x2(ns,m)
-        u0i(ns,m) = u2(ns,m)
-        myavgv=myavgv+u2(ns,m)
+        u2(m,ns)=vpar/sqrt(mims(ns)/ter)
+        mu(m,ns)=0.5*vperp2/b*ter
+        eki(m,ns) = mu(m,ns)*b+0.5*mims(ns)*u2(m,ns)**2
+        pzi(m,ns) = mims(ns)*u2(m,ns)/b-q(ns)*psp/br0
+        z0i(m,ns) = z2(m,ns)
+        xii(m,ns) = x2(m,ns)
+        u0i(m,ns) = u2(m,ns)
+        myavgv=myavgv+u2(m,ns)
 
-        !    LINEAR: perturb w(ns,m) to get linear growth...
-        !         w2(ns,m)=2.*amp*(revers(MyId*cnt+m,13)-0.5) !(ran2(iseed) - 0.5 )
-        w2(ns,m)=2.*amp*sin(pi2/ly*y2(ns,m))*exp(-(z2(ns,m)-lz/2)**2/(lz/8)**2)*exp(-(x2(ns,m)-0.4*lx)**2/(lx/8)**2)
-        if(ns==2)w2(ns,m) = 0.
-        myavgw=myavgw+w2(ns,m)
+        !    LINEAR: perturb w(m,ns) to get linear growth...
+        !         w2(m,ns)=2.*amp*(revers(MyId*cnt+m,13)-0.5) !(ran2(iseed) - 0.5 )
+        w2(m,ns)=2.*amp*sin(pi2/ly*y2(m,ns))*exp(-(z2(m,ns)-lz/2)**2/(lz/8)**2)*exp(-(x2(m,ns)-0.4*lx)**2/(lx/8)**2)
+        if(ns==2)w2(m,ns) = 0.
+        myavgw=myavgw+w2(m,ns)
      end if
   enddo
 170 continue
@@ -1132,68 +1132,68 @@ subroutine loadi(ns)
   if(idg.eq.1)write(*,*)'all reduce'
   avgv=avgv/float(tmm(1))
   do m=1,mm(ns)
-     u2(ns,m)=u2(ns,m)-avgv
-     x3(ns,m)=x2(ns,m)
-     y3(ns,m)=y2(ns,m)
-     z3(ns,m)=z2(ns,m)
-     u3(ns,m)=u2(ns,m)
-     !         w2(ns,m) = w2(ns,m)-myavgw
-     w3(ns,m)=w2(ns,m)
+     u2(m,ns)=u2(m,ns)-avgv
+     x3(m,ns)=x2(m,ns)
+     y3(m,ns)=y2(m,ns)
+     z3(m,ns)=z2(m,ns)
+     u3(m,ns)=u2(m,ns)
+     !         w2(m,ns) = w2(m,ns)-myavgw
+     w3(m,ns)=w2(m,ns)
   enddo
 
   np_old=mm(ns)
-  call init_pmove(z2(ns,:),np_old,lz,ierr)
+  call init_pmove(z2(:,ns),np_old,lz,ierr)
   if(idg.eq.1)write(*,*)'pass init_pmove'
   !
-  call pmove(x2(ns,:),np_old,np_new,ierr)
+  call pmove(x2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
   !$acc update device(x2)
-  call pmove(x3(ns,:),np_old,np_new,ierr)
+  call pmove(x3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
   !$acc update device(x3)
-  call pmove(y2(ns,:),np_old,np_new,ierr)
+  call pmove(y2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(y2(ns,:))
-  call pmove(y3(ns,:),np_old,np_new,ierr)
+  !$acc update device(y2(:,ns))
+  call pmove(y3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(y3(ns,:))
-  call pmove(z2(ns,:),np_old,np_new,ierr)
+  !$acc update device(y3(:,ns))
+  call pmove(z2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z2(ns,:))
-  call pmove(z3(ns,:),np_old,np_new,ierr)
+  !$acc update device(z2(:,ns))
+  call pmove(z3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z3(ns,:))
-  call pmove(u2(ns,:),np_old,np_new,ierr)
+  !$acc update device(z3(:,ns))
+  call pmove(u2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u2(ns,:))
-  call pmove(u3(ns,:),np_old,np_new,ierr)
+  !$acc update device(u2(:,ns))
+  call pmove(u3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u3(ns,:))
-  call pmove(w2(ns,:),np_old,np_new,ierr)
+  !$acc update device(u3(:,ns))
+  call pmove(w2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(w2(ns,:))
-  call pmove(w3(ns,:),np_old,np_new,ierr)
+  !$acc update device(w2(:,ns))
+  call pmove(w3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(w3(ns,:))
-  call pmove(mu(ns,:),np_old,np_new,ierr)
+  !$acc update device(w3(:,ns))
+  call pmove(mu(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(mu(ns,:))
+  !$acc update device(mu(:,ns))
 
-  call pmove(xii(ns,:),np_old,np_new,ierr)
+  call pmove(xii(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(xii(ns,:))
-  call pmove(z0i(ns,:),np_old,np_new,ierr)
+  !$acc update device(xii(:,ns))
+  call pmove(z0i(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z0i(ns,:))
-  call pmove(pzi(ns,:),np_old,np_new,ierr)
+  !$acc update device(z0i(:,ns))
+  call pmove(pzi(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(pzi(ns,:))
-  call pmove(eki(ns,:),np_old,np_new,ierr)
+  !$acc update device(pzi(:,ns))
+  call pmove(eki(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(eki(ns,:))
-  call pmove(u0i(ns,:),np_old,np_new,ierr)
+  !$acc update device(eki(:,ns))
+  call pmove(u0i(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u0i(ns,:))
+  !$acc update device(u0i(:,ns))
 
   !     
   call end_pmove(ierr)

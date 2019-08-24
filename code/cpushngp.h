@@ -1,6 +1,6 @@
                 i=int(xt/dx+0.5)
                 j=int(yt/dy+0.5)
-                k=int(z3(ns,m)/dz+0.5)-gclr*kcnt
+                k=int(z3(m,ns)/dz+0.5)-gclr*kcnt
 
             exp1=exp1 + ex(i,j,k)
             eyp=eyp + ey(i,j,k)
