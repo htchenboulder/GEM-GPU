@@ -235,8 +235,8 @@ ppush1_end_tm=ppush1_end_tm+MPI_WTIME()
        MPI_SUM, MPI_COMM_WORLD,ierr)
 
   np_old=mm(ns)
-  !$acc update host(z3)
-  call init_pmove(z3(:,ns),np_old,lz,ierr)
+  !!$acc update host(z3)
+  call test_init_pmove(z3(:,ns),np_old,lz,ierr)
 
   call test_pmove(x2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
@@ -286,7 +286,7 @@ ppush1_end_tm=ppush1_end_tm+MPI_WTIME()
   call test_pmove(u0i(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
 
-  !$acc update host(x2,x3,y2,y3,z2,z3,u2,u3,w2,w3)
+  !!$acc update host(x2,x3,y2,y3,z2,z3,u2,u3,w2,w3)
   
 
   !!$acc update host(x2) async(1)

@@ -6,8 +6,9 @@ MODULE gem_pputil
   use openacc
   IMPLICIT NONE
   PRIVATE
+  !!!test_init_pmove is added to get a better parallelization(htc)
   !!!test_pmove is added to test the data locality(htc)
-  PUBLIC :: ppinit, ppexit, init_pmove, end_pmove, pmove, guard,test_pmove
+  PUBLIC :: ppinit, ppexit, init_pmove, end_pmove, pmove, guard,test_pmove,test_init_pmove
   PUBLIC :: ppsum, ppmax, ppmin
   PUBLIC :: pptransp, ppcfft2
   PUBLIC :: timera, disp
@@ -19,15 +20,17 @@ MODULE gem_pputil
   INTEGER, SAVE :: pmove_tag=0
   INTEGER, SAVE :: TUBE_COMM,GRID_COMM
   REAL, DIMENSION(:), ALLOCATABLE, SAVE :: s_buf, r_buf
-  !!!declare global module allocatable arrys on both CPU and GPU (htc)
-  !$acc declare create(s_buf,r_buf) 
+  !!!declare global module allocatable arrys on both CPU and GPU (htc), but s_buf and r_buf will be ignored by the compiler in pmove
+  !!!if we use this
+  !!$acc declare create(s_buf,r_buf) 
   INTEGER, DIMENSION(:), ALLOCATABLE, SAVE :: s_counts, s_displ
-  !$acc declare create(s_counts,s_displ)
+  !!$acc declare create(s_counts,s_displ)
   INTEGER, DIMENSION(:), ALLOCATABLE, SAVE :: r_counts, r_displ
-  !$acc declare create(r_counts,r_displ)
-  INTEGER, DIMENSION(:), ALLOCATABLE, SAVE :: ipsend, iphole
+  !!$acc declare create(r_counts,r_displ)
+  !!!!ipfill (htc)
+  INTEGER, DIMENSION(:), ALLOCATABLE, SAVE :: ipsend, iphole,ipfill
   !!!declare global module allocatable arrys on both CPU and GPU (htc)
-  !$acc declare create(ipsend,iphole) 
+  !!$acc declare create(ipsend,iphole) 
 !
   INTERFACE disp
      MODULE PROCEDURE dispi, dispr
@@ -56,7 +59,7 @@ MODULE gem_pputil
 CONTAINS
 !
 !===========================================================================
-  SUBROUTINE init_pmove(xp, np, lz, ierr)
+  SUBROUTINE test_init_pmove(xp, np, lz, ierr)
     !
     use mpi
     !
@@ -68,39 +71,61 @@ CONTAINS
     !  Local vars
     INTEGER :: nsize, ksize,is_present,xpsize
     INTEGER :: i, ip, iz, ih, iwork
+    !!!for ipfill (htc)
+    INTEGER :: nhole_ipf,np_new_ipf,ip_last_ipf,ih_ipf
+    !!!for ipfill (htc)
+    LOGICAL :: is_hole
     REAL :: dzz, xt
     INTEGER, DIMENSION(0:nvp-1) :: isb
+    !!!for iz in a single array(htc)
+    INTEGER, DIMENSION(:), ALLOCATABLE, SAVE ::iz_arr
     !
     !----------------------------------------------------------------------
     !              0.   Allocate fixed size arrays
     !
     IF( .not. ALLOCATED(s_counts) ) THEN 
     ALLOCATE(s_counts(0:nvp-1))
+    !$acc enter data create(s_counts)
     !!!update is not necessary since the module allocatable arrays 
     !!!which appear in declare willbe globally on the CPU and GPU
     endif
     IF( .not. ALLOCATED(s_displ) ) THEN
     ALLOCATE(s_displ(0:nvp-1))
+    !$acc enter data create(s_displ)
     endif
     IF( .not. ALLOCATED(r_counts) ) then
     ALLOCATE(r_counts(0:nvp-1))
+    !$acc enter data create(r_counts)
     endif
     IF( .not. ALLOCATED(r_displ) ) then
     ALLOCATE(r_displ(0:nvp-1))
+    !$acc enter data create(r_displ)
+    endif
+    !
+    !!!for iz in array (htc)
+    !$acc kernels present(xp)
+    xpsize=size(xp)
+    !$acc end kernels
+    IF( .not. ALLOCATED(iz_arr) ) then
+    ALLOCATE(iz_arr(1:xpsize))
+    !$acc enter data create(iz_arr)
     endif
     !
     !----------------------------------------------------------------------
     !              1.  Construct send buffer
-    !!xp use device memory that has been managed outside of openacc (htc)
-    !!$acc kernels deviceptr(xp)
-    !$acc data deviceptr(xp)
-    !!$acc kernels present(xp) !!also work
-    !$acc kernels 
-    dzz = lz / nvp !step-length along z direction
+    !!xp on device(htc)
+    
+    dzz = lz / nvp !step-length along z directioisn
+    !$acc kernels present(xp,iz_arr) 
+    iz_arr= INT(MODULO(xp, lz)/dzz)    !!! Assume periodicity
+    !$acc end kernels
+    !$acc update host(iz_arr)
+    !$acc kernels present(xp,s_displ,s_counts,iz_arr) 
     s_counts = 0
     DO ip = 1,np
-       xt = MODULO(xp(ip), lz)            !!! Assume periodicity
-       iz = INT(xt/dzz)
+       !xt = MODULO(xp(ip), lz)            !!! Assume periodicity
+       !iz = INT(xt/dzz)
+       iz =iz_arr(ip)
        IF( iz .ne. GCLR )THEN
           !$acc atomic update
           s_counts(iz) = s_counts(iz)+1
@@ -112,10 +137,6 @@ CONTAINS
        s_displ(i) = s_displ(i-1) + s_counts(i-1)
     END DO
     !$acc end kernels
-
-
-    !$acc end data
-
     !$acc update host(s_counts,s_displ)
 
 !if(me==0)write(*,*)'init_pmove  xp is_present ', is_present
@@ -128,26 +149,33 @@ CONTAINS
        ALLOCATE(s_buf(1:ksize))
        ALLOCATE(ipsend(1:ksize))
        ALLOCATE(iphole(1:ksize))
-       !$acc enter data create(s_buf,ipsend,iphole)
+       ALLOCATE(ipfill(1:ksize))
+       !$acc enter data create(s_buf,ipsend,iphole,ipfill)
     ELSE IF ( SIZE(s_buf) .LT. nsize ) THEN
-       !$acc exit data delete(s_buf,ipsend,iphole)
+       !$acc exit data delete(s_buf,ipsend,iphole,ipfill)
        DEALLOCATE(s_buf)
        DEALLOCATE(ipsend)
        DEALLOCATE(iphole)
+       DEALLOCATE(ipfill)
        ALLOCATE(s_buf(1:nsize))
        ALLOCATE(ipsend(1:nsize))
        ALLOCATE(iphole(1:nsize))
-       !$acc enter data create(s_buf,ipsend,iphole)
+       ALLOCATE(ipfill(1:nsize))
+       !$acc enter data create(s_buf,ipsend,iphole,ipfill)
     END IF
+
     !
     !----------------------------------------------------------------------
     !              2.  Construct (sorted) pointers to holes
     !
     isb(0:nvp-1) = s_displ(0:nvp-1)
     ih = 0
+
+    !!$acc serial present(xp,ipsend,iphole) copy(ih,isb)
     DO ip=1,np
-       xt = MODULO(xp(ip), lz)            !!! Assume periodicity
-       iz = INT(xt/dzz)
+       !xt = MODULO(xp(ip), lz)            !!! Assume periodicity
+       !iz = INT(xt/dzz)
+       iz=iz_arr(ip)
        IF( iz .ne. GCLR ) THEN
           isb(iz) = isb(iz)+1
           ipsend(isb(iz)) = ip
@@ -155,10 +183,45 @@ CONTAINS
           iphole(ih) = ip
        END IF
     END DO 
+    !!$acc end serial
     !
 
-    !!!update device (htc)
+    !!!update device(htc)
     !$acc update device(ipsend,iphole)
+
+    !!!ipfill (htc)
+    nhole_ipf=sum(s_counts)
+    np_new_ipf=np-nhole_ipf
+    ip_last_ipf=np
+    !$acc serial present(xp,ipfill,iphole,iz_arr)
+    DO ih_ipf=nhole_ipf,1,-1
+    !!!do nothing by default
+       ipfill(ih_ipf)=iphole(ih_ipf)
+       IF( iphole(ih_ipf) .LE. np_new_ipf ) THEN
+          !!!this hole has to be filled
+          !!!search for xp(ip) from the end that is not a hole, need to be in strict sequential order
+          ip=-1
+          !$acc loop seq
+          DO i=ip_last_ipf,1,-1
+             !xt = MODULO(xp(i), lz)            !!! Assume periodicity
+             !iz = INT(xt/dzz)
+             iz=iz_arr(i)
+             is_hole=(iz.NE.GCLR)
+             IF (.NOT. is_hole) THEN
+                !!!found
+                ip=i
+                EXIT
+             END IF
+          END DO
+          !$acc end loop
+          ip_last_ipf=ip-1
+          ipfill(ih_ipf)=ip
+       END IF
+    END DO
+    !$acc end serial
+
+        
+    
 
     !----------------------------------------------------------------------
     !              3.  Construct receive buffer
@@ -178,15 +241,20 @@ CONTAINS
     IF( .not. ALLOCATED(r_buf) ) THEN
        ksize=2*nsize         ! To prevent too much futur reallocations
        ALLOCATE(r_buf(1:ksize))
+       !$acc enter data create(r_buf)
     ELSE IF ( SIZE(r_buf) .LT. nsize ) THEN
+       !$acc exit data delete(r_buf)
        DEALLOCATE(r_buf)
        ALLOCATE(r_buf(1:nsize))
+       !$acc enter data create(r_buf)
     END IF
     !
+
+
     !  Check for part. array overflow
     ierr = 0
     nsize = np - sum(s_counts) + sum(r_counts)
-    if( nsize .gt. size(xp)) then
+    if( nsize .gt. xpsize) then
        write(*,*) 'PE', me, 'Particle array overflow'
        ierr = 1
     end if
@@ -197,7 +265,7 @@ CONTAINS
     !
     pmove_tag = 101
     !
-  END SUBROUTINE init_pmove
+  END SUBROUTINE test_init_pmove
 !===========================================================================
 !!!test data locality (htc)
   SUBROUTINE test_pmove(xp, np_old, np_new, ierr)
@@ -226,6 +294,10 @@ CONTAINS
 
 !  time diagnosis
     real :: start_tm,end_tm,tottm_1,tottm_2,tottm_3,tottm_4,tottm_5
+!!!temp arrays (htc)
+    !REAL, DIMENSION (size(s_buf)) :: s_tmp
+    !REAL, DIMENSION (size(r_buf)) :: r_tmp
+    !!$acc enter data create(s_tmp,r_tmp) 
 !----------------------------------------------------------------------
 !              1.  Fill send buffer
 
@@ -241,19 +313,19 @@ CONTAINS
 start_tm=MPI_WTIME()
 
 #ifndef __PMOVE_DEBUG
-!!!xp data already resides on the devices (htc)
-!!!explicit parallelism (htc)
-!!!any scalar accessed within a parallel loop will be made firstprivate by default (htc)
-!is_present=acc_is_present(s_buf)
-!write(*,*)'test_pmove  s_buf is_present ', is_present,'me=',me
-!is_present=acc_is_present(s_counts)
-!write(*,*)'test_pmove  s_counts is_present ', is_present,'me=',me
+!!!!xp data already resides on the devices (htc)
+!!!!explicit parallelism (htc)
+!!!!any scalar accessed within a parallel loop will be made firstprivate by default (htc)
+!!is_present=acc_is_present(s_buf)
+!!write(*,*)'test_pmove  s_buf is_present ', is_present,'me=',me
+!!is_present=acc_is_present(s_counts)
+!!write(*,*)'test_pmove  s_counts is_present ', is_present,'me=',me
     DO i=0,nvp-1
        IF( s_counts(i) .GT. 0 ) THEN
           isrt = s_displ(i)+1
           iend = s_displ(i)+s_counts(i)
           !!!s_buf without generating present!
-          !$acc kernels present(xp)
+          !$acc kernels present(xp,s_buf,ipsend)
           s_buf(isrt:iend) = xp(ipsend(isrt:iend))
           !$acc end kernels
        END IF
@@ -261,16 +333,16 @@ start_tm=MPI_WTIME()
 !!!!update host (htc)
 !$acc update host(s_buf)
 
-end_tm=MPI_WTIME()
-tottm_1=end_tm-start_tm
-if(me==0)write(*,*)'pmove, part1 ',tottm_1
+!end_tm=MPI_WTIME()
+!tottm_1=end_tm-start_tm
+!if(me==0)write(*,*)'pmove, part1 ',tottm_1
+
 !----------------------------------------------------------------------
 !              2.   Initiate non-blocking send/receive
 !
 start_tm=MPI_WTIME()
     pmove_tag = pmove_tag+1
 
-    !!$acc serial 
     nrrecv=0             !......... Start non-blocking receive
     DO i=0,nvp-1
        IF(r_counts(i) .GT. 0 ) THEN
@@ -294,7 +366,6 @@ start_tm=MPI_WTIME()
           !!$acc end host_data
        END IF
     END DO
-    !!$acc end serial 
 end_tm=MPI_WTIME()
 tottm_2=end_tm-start_tm
 if(me==0)write(*,*)'pmove part2 ',tottm_2
@@ -339,13 +410,19 @@ tottm_2=end_tm-start_tm
 start_tm=MPI_WTIME()
     nhole = sum(s_counts)
     ip = np_old
-    !!!this loop should be executed sequentially
-    !$acc kernels present(xp)
-    DO ih = nhole, 1, -1
-       xp(iphole(ih)) = xp(ip)
-       ip = ip-1
+    !!!!this loop should be executed sequentially
+    !!$acc kernels present(xp,iphole)
+    !DO ih = nhole, 1, -1
+       !xp(iphole(ih)) = xp(ip)
+       !ip = ip-1
+    !END DO
+    !!$acc end kernels
+
+    !$acc parallel loop independent present(xp,iphole,ipfill)
+    DO ih =1,nhole
+       xp(iphole(ih)) = xp(ipfill(ih))
     END DO
-    !$acc end kernels
+    !$acc end parallel
 
     !!!the live-out scalar ip will result in accelerator restriction
     !np_new = ip
@@ -380,7 +457,7 @@ start_tm=MPI_WTIME()
        iend = np_new + tot_count
 
        !$acc update device(r_buf)
-       !$acc kernels present(xp)
+       !$acc kernels present(xp,r_buf)
        xp(isrt:iend) = r_buf(1:tot_count)
        !$acc end kernels
        
@@ -415,6 +492,143 @@ tottm_5=end_tm-start_tm
 !if(me==0)write(*,*)'pmove part5 ', tottm_5
 !----------------------------------------------------------------------!
   END SUBROUTINE test_pmove
+!===========================================================================
+  SUBROUTINE init_pmove(xp, np, lz, ierr)
+    !
+    use mpi
+    !
+    REAL, DIMENSION(:), INTENT(in) :: xp !z position of particles
+    INTEGER, INTENT(in) :: np !total number of particles
+    REAL, INTENT(in) :: lz !total length of z direction
+    INTEGER, INTENT(out) :: ierr
+    !
+    !  Local vars
+    INTEGER :: nsize, ksize
+    INTEGER :: i, ip, iz, ih, iwork
+    REAL :: dzz, xt
+    INTEGER, DIMENSION(0:nvp-1) :: isb
+    !
+    !----------------------------------------------------------------------
+    !              0.   Allocate fixed size arrays
+    !
+    IF( .not. ALLOCATED(s_counts) ) THEN 
+    ALLOCATE(s_counts(0:nvp-1))
+    !$acc enter data create(s_counts)
+    endif
+    IF( .not. ALLOCATED(s_displ) ) THEN
+    ALLOCATE(s_displ(0:nvp-1))
+    !$acc enter data create(s_displ)
+    endif
+    IF( .not. ALLOCATED(r_counts) ) then
+    ALLOCATE(r_counts(0:nvp-1))
+    !$acc enter data create(r_counts)
+    endif
+    IF( .not. ALLOCATED(r_displ) ) then
+    ALLOCATE(r_displ(0:nvp-1))
+    !$acc enter data create(r_displ)
+    endif
+    !
+    !----------------------------------------------------------------------
+    !              1.  Construct send buffer
+    dzz = lz / nvp !step-length along z direction
+    s_counts = 0
+    DO ip = 1,np
+       xt = MODULO(xp(ip), lz)            !!! Assume periodicity
+       iz = INT(xt/dzz)
+       IF( iz .ne. GCLR )THEN
+          s_counts(iz) = s_counts(iz)+1
+       END IF
+    END DO
+    s_displ(0) = 0
+    DO i=1,nvp-1
+       s_displ(i) = s_displ(i-1) + s_counts(i-1)
+    END DO
+
+    nsize = sum(s_counts)
+    IF( .not. ALLOCATED(s_buf) ) THEN
+       ksize=2*nsize         ! To prevent too much futur reallocations
+       ALLOCATE(s_buf(1:ksize))
+       ALLOCATE(ipsend(1:ksize))
+       ALLOCATE(iphole(1:ksize))
+       ALLOCATE(ipfill(1:ksize))
+       !$acc enter data create(s_buf,ipsend,iphole,ipfill)
+    ELSE IF ( SIZE(s_buf) .LT. nsize ) THEN
+       !$acc exit data delete(s_buf,ipsend,iphole,ipfill)
+       DEALLOCATE(s_buf)
+       DEALLOCATE(ipsend)
+       DEALLOCATE(iphole)
+       DEALLOCATE(ipfill)
+       ALLOCATE(s_buf(1:nsize))
+       ALLOCATE(ipsend(1:nsize))
+       ALLOCATE(iphole(1:nsize))
+       ALLOCATE(ipfill(1:nsize))
+       !$acc enter data create(s_buf,ipsend,iphole,ipfill)
+    END IF
+
+    !
+    !----------------------------------------------------------------------
+    !              2.  Construct (sorted) pointers to holes
+    !
+    isb(0:nvp-1) = s_displ(0:nvp-1)
+    ih = 0
+    DO ip=1,np
+       xt = MODULO(xp(ip), lz)            !!! Assume periodicity
+       iz = INT(xt/dzz)
+       IF( iz .ne. GCLR ) THEN
+          isb(iz) = isb(iz)+1
+          ipsend(isb(iz)) = ip
+          ih = ih+1
+          iphole(ih) = ip
+       END IF
+    END DO 
+    !
+
+
+        
+    
+
+    !----------------------------------------------------------------------
+    !              3.  Construct receive buffer
+    CALL MPI_ALLTOALL(s_counts, 1, MPI_INTEGER, &
+         & r_counts, 1, MPI_INTEGER, TUBE_COMM, ierr)
+
+    r_displ(0) = 0
+    DO i=1,nvp-1
+       r_displ(i) = r_displ(i-1) + r_counts(i-1)
+    END DO
+
+    nsize = sum(r_counts)
+
+
+    IF( .not. ALLOCATED(r_buf) ) THEN
+       ksize=2*nsize         ! To prevent too much futur reallocations
+       ALLOCATE(r_buf(1:ksize))
+       !$acc enter data create(r_buf)
+    ELSE IF ( SIZE(r_buf) .LT. nsize ) THEN
+       !$acc exit data delete(r_buf)
+       DEALLOCATE(r_buf)
+       ALLOCATE(r_buf(1:nsize))
+       !$acc enter data create(r_buf)
+    END IF
+    !
+
+
+    !  Check for part. array overflow
+    ierr = 0
+    nsize = np - sum(s_counts) + sum(r_counts)
+    if( nsize .gt. size(xp)) then
+       write(*,*) 'PE', me, 'Particle array overflow'
+       ierr = 1
+    end if
+    !    call ppsum(ierr)
+    !
+    !----------------------------------------------------------------------
+    !              4.  Initialize tag
+    !
+    pmove_tag = 101
+    !
+  END SUBROUTINE init_pmove
+!===========================================================================
   SUBROUTINE pmove(xp, np_old, np_new, ierr)
 !
     use mpi

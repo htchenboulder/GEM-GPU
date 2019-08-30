@@ -249,7 +249,7 @@ cpush1_start_tm=cpush1_start_tm+MPI_WTIME()
 
 cpush1_end_tm=cpush1_end_tm+MPI_WTIME()
 !!$acc update host(w3,x2,x3,y2,y3,z2,z3,u2,u3,w2)
-!$acc update host(z3)
+!!$acc update host(z3)
 
 
 
@@ -310,7 +310,7 @@ cpush1_end_tm=cpush1_end_tm+MPI_WTIME()
 
   np_old=mm(ns)
   call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-  call init_pmove(z3(:,ns),np_old,lz,ierr)
+  call test_init_pmove(z3(:,ns),np_old,lz,ierr)
   
   
 
@@ -364,7 +364,7 @@ cpush1_end_tm=cpush1_end_tm+MPI_WTIME()
   call test_pmove(u0i(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
 
-  !$acc update host(x2,x3,y2,y3,z2,z3,u2,u3,w2,w3)
+  !!$acc update host(x2,x3,y2,y3,z2,z3,u2,u3,w2,w3)
 
 
 

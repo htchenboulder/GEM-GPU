@@ -123,10 +123,11 @@ module gem_com
   REAL,DIMENSION(:,:),allocatable :: x3,y3,z3,u3
   REAL,DIMENSION(:,:),allocatable :: w2,w3
 
-  !$acc declare create(mu,xii,pzi,eki,z0i,u0i)
-  !$acc declare create(x2,y2,z2,u2)
-  !$acc declare create(x3,y3,z3,u3)
-  !$acc declare create(w2,w3)
+  !!$acc declare create(mu,xii,pzi,eki,z0i,u0i)
+  !!$acc declare create(x2,y2,z2,u2)
+  !!$acc declare create(x3,y3,z3,u3)
+  !!$acc declare create(w2,w3)
+
 
   REAL,DIMENSION(:),allocatable :: mue,xie,pze,eke,z0e,u0e
   REAL,DIMENSION(:),allocatable :: x2e,y2e,z2e,u2e,mue2
@@ -252,7 +253,8 @@ contains
     allocate( x2(1:mmx,nsmx),y2(1:mmx,nsmx),z2(1:mmx,nsmx),u2(1:mmx,nsmx))
     allocate( x3(1:mmx,nsmx),y3(1:mmx,nsmx),z3(1:mmx,nsmx),u3(1:mmx,nsmx))
     allocate( w2(1:mmx,nsmx),w3(1:mmx,nsmx))
-    !$acc enter data copyin(x2,y2,z2,u2,x3,y3,z3,w2,w3)
+    !$acc enter data create(x2,y2,z2,u2,u3,x3,y3,z3,w2,w3)
+    !$acc enter data create(mu,xii,pzi,eki,z0i,u0i)
 
     allocate( mue(1:mmxe),xie(1:mmxe),pze(1:mmxe),eke(1:mmxe),z0e(1:mmxe),u0e(1:mmxe))
     allocate( x2e(1:mmxe),y2e(1:mmxe),z2e(1:mmxe),u2e(1:mmxe),mue2(1:mmxe))
