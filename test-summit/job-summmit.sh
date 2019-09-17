@@ -20,4 +20,5 @@ mkdir -p dump
 ##nvprof option: p means number of mpi, openmp-profiling off means only gpu timeline will be reported
 #jsrun -n 24 -a 7 -g 1 -c 7 nvprof -s --openmp-profiling off --output-profile gem.%p.prof ./gem_main > run.out 2> run.err
 #pure option
-jsrun -n 24 -a 7 -g 1 -c 7 ./gem_main > run.out 2>run.err
+#jsrun -n 24 -a 7 -g 1 -c 7 ./gem_main > run.out 2>run.err
+jsrun --smpiargs="-gpu" -n 24 -a 7 -g 1 -c 7  ./gem_main > run.out 2>run.err
