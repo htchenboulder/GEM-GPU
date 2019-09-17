@@ -120,7 +120,7 @@ CONTAINS
     iz_arr= INT(MODULO(xp, lz)/dzz)    !!! Assume periodicity
     !$acc end kernels
     !$acc update host(iz_arr)
-    !$acc kernels present(xp,s_displ,s_counts,iz_arr) 
+    !$acc kernels present(s_displ,s_counts,iz_arr) 
     s_counts = 0
     DO ip = 1,np
        !xt = MODULO(xp(ip), lz)            !!! Assume periodicity
@@ -190,7 +190,9 @@ CONTAINS
     !$acc update device(ipsend,iphole)
 
     !!!ipfill (htc)
+    !$acc kernels present(s_counts)
     nhole_ipf=sum(s_counts)
+    !$acc end kernels 
     np_new_ipf=np-nhole_ipf
     ip_last_ipf=np
     !$acc serial present(xp,ipfill,iphole,iz_arr)
@@ -278,7 +280,7 @@ CONTAINS
 !
 !  Local vars
     INTEGER :: nsize
-    INTEGER :: i, ii, ip, iz, ih, isrc
+    INTEGER :: i, ii, ip, iz, ih, isrc,isbuf
     INTEGER :: nhole, mhole, nrrecv, nrsend, nptot_old, nptot
     INTEGER :: ind, count, tot_count, iwork
     INTEGER :: is_present
@@ -289,25 +291,35 @@ CONTAINS
   !!!declare global module arrays on both CPU and GPU (htc)
   !!$acc declare create(s_requ,r_requ,id_source) 
   !!is_present is used to test the data is on device or not, using acc_is_present
-    INTEGER :: isrt, iend, isrt_receive, isrt_send
+    INTEGER :: isrt, iend, isrt_receive, isrt_send,s_buf_length
     INTEGER :: status(MPI_STATUS_SIZE), arr_status(MPI_STATUS_SIZE,nvp)
 
 !  time diagnosis
     real :: start_tm,end_tm,tottm_1,tottm_2,tottm_3,tottm_4,tottm_5
-!!!temp arrays (htc)
-    !REAL, DIMENSION (size(s_buf)) :: s_tmp
-    !REAL, DIMENSION (size(r_buf)) :: r_tmp
-    !!$acc enter data create(s_tmp,r_tmp) 
+!!!temp arrays for test GPU aware MPI(htc)
+    REAL, DIMENSION (1:nvp) :: s_tmp
+    REAL, DIMENSION (1:nvp) :: r_tmp
+    !$acc enter data create(s_tmp,r_tmp) 
 !----------------------------------------------------------------------
-!              1.  Fill send buffer
+!              0.  Test GPU aware MPI
 
-!!!test xp is on device or not (htc)
-!is_present=acc_is_present(xp)
-!write(*,*)'test_pmove  xp is_present ', is_present,'me=',me
 
+!$acc data present(r_tmp,s_tmp)
+!$acc host_data use_device(r_tmp)
+CALL MPI_IRECV(r_tmp, nvp, MPI_REAL8,&
+& 0, 100, TUBE_COMM, MPI_STATUS_IGNORE)
+!$acc end host_data
+!$acc host_data use_device(r_tmp)
+CALL MPI_ISSEND(s_tmp, nvp, MPI_REAL8,&
+& 1, 100, TUBE_COMM)
+!$acc end host_data
+!$acc end data
 !----------------------------------------------------------------------
 !              1.  Fill send buffer
 !
+!!!test xp is on device or not (htc)
+!is_present=acc_is_present(xp)
+!write(*,*)'test_pmove  xp is_present ', is_present,'me=',me
 
 
 start_tm=MPI_WTIME()
@@ -315,23 +327,28 @@ start_tm=MPI_WTIME()
 #ifndef __PMOVE_DEBUG
 !!!!xp data already resides on the devices (htc)
 !!!!explicit parallelism (htc)
-!!!!any scalar accessed within a parallel loop will be made firstprivate by default (htc)
 !!is_present=acc_is_present(s_buf)
 !!write(*,*)'test_pmove  s_buf is_present ', is_present,'me=',me
-!!is_present=acc_is_present(s_counts)
-!!write(*,*)'test_pmove  s_counts is_present ', is_present,'me=',me
+
+!$acc parallel loop independent present(xp,s_buf,ipsend,s_displ,s_counts)
     DO i=0,nvp-1
        IF( s_counts(i) .GT. 0 ) THEN
           isrt = s_displ(i)+1
           iend = s_displ(i)+s_counts(i)
-          !!!s_buf without generating present!
-          !$acc kernels present(xp,s_buf,ipsend)
-          s_buf(isrt:iend) = xp(ipsend(isrt:iend))
-          !$acc end kernels
+          !$acc loop independent
+          DO isbuf=isrt,iend
+             s_buf(isbuf) = xp(ipsend(isbuf))
+          END DO
+          !$acc end loop 
        END IF
     END DO
+!$acc end parallel
+
 !!!!update host (htc)
-!$acc update host(s_buf)
+!$acc kernels present(s_counts)
+s_buf_length=sum(s_counts(:))
+!$acc end kernels
+!$acc update host(s_buf(1:s_buf_length))
 
 !end_tm=MPI_WTIME()
 !tottm_1=end_tm-start_tm
@@ -349,10 +366,12 @@ start_tm=MPI_WTIME()
           nrrecv=nrrecv+1
           id_source(nrrecv) = i
           isrt = r_displ(i)+1
+          !!$acc data present(r_buf,r_counts)
           !!$acc host_data use_device(r_buf,r_counts)
           CALL MPI_IRECV(r_buf(isrt), r_counts(i), MPI_REAL8,&
                & i, pmove_tag, TUBE_COMM, r_requ(nrrecv), ierr)
           !!$acc end host_data
+          !!$acc end data
        END IF
     END DO
     nrsend=0             !......... Start non-blocking SYNCHRONOUS send
@@ -360,10 +379,12 @@ start_tm=MPI_WTIME()
        IF(s_counts(i) .GT. 0 ) THEN
           nrsend=nrsend+1
           isrt = s_displ(i)+1
+          !!$acc data present(s_buf,s_counts)
           !!$acc host_data use_device(s_buf,s_counts)
           CALL MPI_ISSEND(s_buf(isrt), s_counts(i), MPI_REAL8,&
                & i, pmove_tag, TUBE_COMM, s_requ(nrsend), ierr)
           !!$acc end host_data
+          !!$acc end data
        END IF
     END DO
 end_tm=MPI_WTIME()
@@ -410,27 +431,14 @@ tottm_2=end_tm-start_tm
 start_tm=MPI_WTIME()
     nhole = sum(s_counts)
     ip = np_old
-    !!!!this loop should be executed sequentially
-    !!$acc kernels present(xp,iphole)
-    !DO ih = nhole, 1, -1
-       !xp(iphole(ih)) = xp(ip)
-       !ip = ip-1
-    !END DO
-    !!$acc end kernels
 
     !$acc parallel loop independent present(xp,iphole,ipfill)
     DO ih =1,nhole
        xp(iphole(ih)) = xp(ipfill(ih))
     END DO
     !$acc end parallel
-
-    !!!the live-out scalar ip will result in accelerator restriction
-    !np_new = ip
-    !!!to avoid live-out scalar
     np_new = np_old-nhole
-    !ip=np_new
 !
-!if(me==0)write(*,*)'np_old,np_new,nhole ',np_old,np_new,nhole
 end_tm=MPI_WTIME()
 tottm_3=end_tm-start_tm
 if(me==0)write(*,*)'pmove part3 ', tottm_3
@@ -456,7 +464,7 @@ start_tm=MPI_WTIME()
        isrt = np_new + 1
        iend = np_new + tot_count
 
-       !$acc update device(r_buf)
+       !$acc update device(r_buf(1:tot_count))
        !$acc kernels present(xp,r_buf)
        xp(isrt:iend) = r_buf(1:tot_count)
        !$acc end kernels
