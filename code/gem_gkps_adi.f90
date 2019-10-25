@@ -103,13 +103,13 @@ subroutine gkps_adiabatic_electron(nstep,ip)
                 grdgtp=wx0*wz0*grdgt(i1,k)+wx0*wz1*grdgt(i1,k+1) &
                        +wx1*wz0*grdgt(i1+1,k)+wx1*wz1*grdgt(i1+1,k+1)
                  
-                m1=mstart+int((float(m)+1.0)/2)
+                m1=mstart+int((real(m)+1.0)/2)
                 if(m==0)m1=0
                 sgny=isgnft(m)
 
-                ky=sgny*2.*pi*float(m1)/ly
-                kx1=pi*float(l)/lx
-                kx2=-pi*float(l)/lx
+                ky=sgny*2.*pi*real(m1)/ly
+                kx1=pi*real(l)/lx
+                kx2=-pi*real(l)/lx
                  
                 ! the b+ and b- value
                 do ns=1,nsm

@@ -37,11 +37,11 @@ subroutine grid1(ip,n)
 grid11_start_tm=grid11_start_tm+MPI_WTIME()
 !$acc parallel loop gang vector private(rhox,rhoy)
      do m=1,mm(ns)
-        dv=float(lr(1))*(dx*dy*dz)
-        r=x3(m,ns)-0.5*lx+lr0
+        dv=real(lr(1))*(dx*dy*dz)
+        r=x3(ns,m)-0.5*lx+lr0
 
-        k = int(z3(m,ns)/delz)
-        wz0 = ((k+1)*delz-z3(m,ns))/delz
+        k = int(z3(ns,m)/delz)
+        wz0 = ((k+1)*delz-z3(ns,m))/delz
         wz1 = 1-wz0
         th = wz0*thfnz(k)+wz1*thfnz(k+1)
 
@@ -75,7 +75,7 @@ grid11_start_tm=grid11_start_tm+MPI_WTIME()
         !         b=1.-lr0/br0*cost
         b=1.-tor+tor*bfldp
 
-        rhog=sqrt(2.*b*mu(m,ns)*mims(ns))/(q(ns)*b)*iflr
+        rhog=sqrt(2.*b*mu(ns,m)*mims(ns))/(q(ns)*b)*iflr
 
         rhox(1) = rhog*(1-tor)+rhog*grp*tor
         rhoy(1) = rhog*gxdgyp/grp*tor
@@ -86,16 +86,16 @@ grid11_start_tm=grid11_start_tm+MPI_WTIME()
         rhox(4) = 0
         rhoy(4) = -rhoy(3)
 
-        vfac=0.5*(mims(ns)*u3(m,ns)**2 + 2.*mu(m,ns)*b )
-        wght=w3(m,ns)/dv
+        vfac=0.5*(mims(ns)*u3(ns,m)**2 + 2.*mu(ns,m)*b )
+        wght=w3(ns,m)/dv
 
-        vpar = u3(m,ns) !linearly correct
+        vpar = u3(ns,m) !linearly correct
 
         !    now do 1,2,4 point average, where lr is the no. of points...
 !$acc loop seq
         do l=1,lr(1)
-           xs=x3(m,ns)+rhox(l) !rwx(1,l)*rhog
-           yt=y3(m,ns)+rhoy(l) !(rwy(1,l)+sz*rwx(1,l))*rhog
+           xs=x3(ns,m)+rhox(l) !rwx(1,l)*rhog
+           yt=y3(ns,m)+rhoy(l) !(rwy(1,l)+sz*rwx(1,l))*rhog
            xt=mod(xs+800.*lx,lx)
            yt=mod(yt+800.*ly,ly)
            xt = min(xt,lx-1.e-8)
@@ -103,7 +103,7 @@ grid11_start_tm=grid11_start_tm+MPI_WTIME()
 
            i=int(xt/dx+0.5)
            j=int(yt/dy+0.5)
-           k=int(z3(m,ns)/dz+0.5)-gclr*kcnt
+           k=int(z3(ns,m)/dz+0.5)-gclr*kcnt
 
 
 !$acc atomic update
@@ -119,6 +119,7 @@ grid11_start_tm=grid11_start_tm+MPI_WTIME()
         enddo
      enddo
 !$acc end parallel
+!$acc wait
 grid11_end_tm=grid11_end_tm+MPI_WTIME()
 
      if(idg.eq.1)write(*,*)myid,'pass ion grid1'

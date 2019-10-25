@@ -20,24 +20,25 @@ module gem_com
   END INTERFACE
 
   integer :: imx,jmx,kmx,mmx,mmxe,nmx,nsmx,nsubd=8,&
-       modemx,ntube=4,nxpp,ngdx=5,nb=6, &
+       modemx,ntube=64,nxpp,ngdx=5,nb=6, &
        negrd=8,nlgrd=8
 
   character(len=70) outname
   REAL :: endtm,begtm,pstm
-  REAL :: starttm,lasttm,exact_total_tm,tottm, &
-          accumulate_start_tm,accumulate_end_tm,accumulate_tot_tm, &
-          poisson_start_tm,poisson_end_tm,poisson_tot_tm, &
-          field_start_tm,field_end_tm,field_tot_tm, &
-          diagnose_start_tm,diagnose_end_tm,diagnose_tot_tm, &
-          reporter_start_tm,reporter_end_tm,reporter_tot_tm, &
-          push_start_tm,push_end_tm,push_tot_tm, &
-          grid1_start_tm,grid1_end_tm,grid1_tot_tm, &
-          ppush_start_tm,ppush_end_tm,ppush_tot_tm, &
-          cpush_start_tm,cpush_end_tm,cpush_tot_tm, &
-          ppush1_start_tm,ppush1_end_tm,ppush1_tot_tm, &
-          cpush1_start_tm,cpush1_end_tm,cpush1_tot_tm, &
-          grid11_start_tm,grid11_end_tm
+  REAL :: starttm=0,lasttm=0,exact_total_tm=0,tottm=0, &
+          accumulate_start_tm=0,accumulate_end_tm=0,accumulate_tot_tm=0, &
+          poisson_start_tm=0,poisson_end_tm=0,poisson_tot_tm=0, &
+          field_start_tm=0,field_end_tm=0,field_tot_tm=0, &
+          diagnose_start_tm=0,diagnose_end_tm=0,diagnose_tot_tm=0, &
+          reporter_start_tm=0,reporter_end_tm=0,reporter_tot_tm=0, &
+          push_start_tm=0,push_end_tm=0,push_tot_tm=0, &
+          grid1_start_tm=0,grid1_end_tm=0,grid1_tot_tm=0, &
+          ppush_start_tm=0,ppush_end_tm=0,ppush_tot_tm=0, &
+          cpush_start_tm=0,cpush_end_tm=0,cpush_tot_tm=0, &
+          ppush1_start_tm=0,ppush1_end_tm=0,ppush1_tot_tm=0, &
+          cpush1_start_tm=0,cpush1_end_tm=0,cpush1_tot_tm=0, &
+          grid11_start_tm=0,grid11_end_tm=0,ftcamp_start_tm=0,&
+          ftcamp_end_tm=0
   real :: grid11_tot_tm,poisson0_start_tm,poisson0_end_tm,poisson0_tot_tm
   real :: aux1(50000),aux2(20000)
   real,dimension(:),allocatable :: workx,worky,workz
@@ -55,7 +56,8 @@ module gem_com
 
   integer :: mme,mmb
   REAL, dimension(:,:),allocatable :: rwx,rwy
-  INTEGER,dimension(:),allocatable :: mm,tmm,lr
+  !!!tmm is the tmm per tube, i.e., tmm_old(1)=tmm_new(1)*ntube
+  INTEGER,dimension(:),allocatable :: mm,lr,tmm
   !$acc declare create(lr)
   REAL,dimension(:),allocatable :: tets,mims,q
   !$acc declare create(mims,q)
@@ -123,11 +125,10 @@ module gem_com
   REAL,DIMENSION(:,:),allocatable :: x3,y3,z3,u3
   REAL,DIMENSION(:,:),allocatable :: w2,w3
 
-  !!$acc declare create(mu,xii,pzi,eki,z0i,u0i)
-  !!$acc declare create(x2,y2,z2,u2)
-  !!$acc declare create(x3,y3,z3,u3)
-  !!$acc declare create(w2,w3)
-
+  !$acc declare create(mu,xii,pzi,eki,z0i,u0i)
+  !$acc declare create(x2,y2,z2,u2)
+  !$acc declare create(x3,y3,z3,u3)
+  !$acc declare create(w2,w3)
 
   REAL,DIMENSION(:),allocatable :: mue,xie,pze,eke,z0e,u0e
   REAL,DIMENSION(:),allocatable :: x2e,y2e,z2e,u2e,mue2
@@ -248,13 +249,11 @@ contains
     allocate (gn0e(0:nxpp),gt0e(0:nxpp),gt0i(0:nxpp),avap(0:nxpp))
     allocate (gn0s(1:5,0:nxpp))
     !          particle array declarations
-    allocate( mu(1:mmx,nsmx),xii(1:mmx,nsmx),pzi(1:mmx,nsmx), &
-         eki(1:mmx,nsmx),z0i(1:mmx,nsmx),u0i(1:mmx,nsmx))
-    allocate( x2(1:mmx,nsmx),y2(1:mmx,nsmx),z2(1:mmx,nsmx),u2(1:mmx,nsmx))
-    allocate( x3(1:mmx,nsmx),y3(1:mmx,nsmx),z3(1:mmx,nsmx),u3(1:mmx,nsmx))
-    allocate( w2(1:mmx,nsmx),w3(1:mmx,nsmx))
-    !$acc enter data create(x2,y2,z2,u2,u3,x3,y3,z3,w2,w3)
-    !$acc enter data create(mu,xii,pzi,eki,z0i,u0i)
+    allocate( mu(nsmx,1:mmx),xii(nsmx,1:mmx),pzi(nsmx,1:mmx), &
+         eki(nsmx,1:mmx),z0i(nsmx,1:mmx),u0i(nsmx,1:mmx))
+    allocate( x2(nsmx,1:mmx),y2(nsmx,1:mmx),z2(nsmx,1:mmx),u2(nsmx,1:mmx))
+    allocate( x3(nsmx,1:mmx),y3(nsmx,1:mmx),z3(nsmx,1:mmx),u3(nsmx,1:mmx))
+    allocate( w2(nsmx,1:mmx),w3(nsmx,1:mmx))
 
     allocate( mue(1:mmxe),xie(1:mmxe),pze(1:mmxe),eke(1:mmxe),z0e(1:mmxe),u0e(1:mmxe))
     allocate( x2e(1:mmxe),y2e(1:mmxe),z2e(1:mmxe),u2e(1:mmxe),mue2(1:mmxe))

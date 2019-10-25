@@ -6,10 +6,10 @@ DFFTPACK=dfftpack/libdfftpack.a
 LIBS = $(DFFTPACK)
 PLIB = gem_pputil.o
 
-#PMOVE_DEBUG_OPT= -D__PMOVE_DEBUG
+PMOVE_DEBUG_OPT= -D__PMOVE_DEBUG
 F90 = mpifort
-OPT = -fast -r8 -Kieee -llapack -lblas -cpp -Minfo=accel -acc -ta=nvidia:cc70 #-Xcompiler -rdynamic -lineinfo
-#OPT = -fast -r8 -Kieee -llapack -lblas -cpp -Minfo=all -acc -ta=nvidia:cc70 #-Xcompiler -rdynamic -lineinfo
+OPT = -fast -r8 -Kieee -llapack -lblas -cpp #-Minfo=accel -acc -ta=nvidia:cc70 #-Xcompiler -rdynamic -lineinfo
+#OPT = -g -r8 -Kieee -llapack -lblas -cpp #-Minfo=accel -acc -ta=nvidia:cc70 #-Xcompiler -rdynamic -lineinfo
 #PURE CPU
 #OPT = -fast -r8 -Kieee -llapack -lblas -cpp
 #OPT = -FR -r8 -heap-arrays -O2 -g -traceback -check bounds

@@ -592,7 +592,7 @@ subroutine pol2d
         wx0 = (rin+(i1+1)*dr-r)/dr
         wx1 = 1.-wx0
         do ith = 0,n2
-           th = -pi+pi2/float(n2)*ith
+           th = -pi+pi2/real(n2)*ith
            j1 = int((th+pi)/dth)
            j1 = min(j1,ntheta-1)
            wz0 = (-pi+(j1+1)*dth-th)/dth
@@ -621,7 +621,7 @@ subroutine pol2d
           status='unknown',position='rewind')
 
      do ir = 0,n1
-        r = rin+(rout-rin)/float(n1)*ir
+        r = rin+(rout-rin)/real(n1)*ir
         i1 = int((r-rin)/dr)
         i1 = min(i1,nr-1)
         wr0 = (rin+(i1+1)*dr-r)/dr
@@ -631,7 +631,7 @@ subroutine pol2d
         qr = wr0*sf(i1)+wr1*sf(i1+1)
         grdm(:,ir) = 0.
         do ith = 0,n2
-           th = -pi+pi2/float(n2)*ith
+           th = -pi+pi2/real(n2)*ith
            j1 = int((th+pi)/dth)
            j1 = min(j1,ntheta-1)
            wz0 = (-pi+(j1+1)*dth-th)/dth
@@ -661,11 +661,11 @@ subroutine pol2d
            k=int(zt/dz)
            k = min(k,kmx-1)
 
-           wx0=float(i+1)-xt/dx 
+           wx0=real(i+1)-xt/dx 
            wx1=1.-wx0
-           wy0=float(j+1)-yt/dy
+           wy0=real(j+1)-yt/dy
            wy1=1.-wy0
-           wz0=float(k+1)-zt/dz
+           wz0=real(k+1)-zt/dz
            wz1=1.-wz0
            dum = wx0*wy0*wz0*grd(i,j,k)  &
                 + wx1*wy0*wz0*grd(i+1,j,k) &

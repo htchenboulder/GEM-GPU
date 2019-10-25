@@ -13,7 +13,6 @@ subroutine ppush(n,ns)
   real :: dbdrp,dbdtp,grcgtp,bfldp,fp,radiusp,dydrp,qhatp,psipp,jfnp,grdgtp
   real :: grp,gxdgyp,rhox(4),rhoy(4),psp,pzp,vncp,vparspp,psip2p,bdcrvbp,curvbzp,dipdrp
   integer :: mynopi
-  
 
   pidum = 1./(pi*2)**1.5*vwidth**3
   mynopi = 0
@@ -21,9 +20,9 @@ subroutine ppush(n,ns)
 ppush1_start_tm=ppush1_start_tm+MPI_WTIME()
 !$acc parallel loop gang vector private(rhox,rhoy)
   do m=1,mm(ns)
-     r=x2(m,ns)-0.5*lx+lr0
-     k = int(z2(m,ns)/delz)
-     wz0 = ((k+1)*delz-z2(m,ns))/delz
+     r=x2(ns,m)-0.5*lx+lr0
+     k = int(z2(ns,m)/delz)
+     wz0 = ((k+1)*delz-z2(ns,m))/delz
      wz1 = 1-wz0
      th = wz0*thfnz(k)+wz1*thfnz(k+1)
 
@@ -72,9 +71,9 @@ ppush1_start_tm=ppush1_start_tm+MPI_WTIME()
      psip2p = wx0*psip2(i)+wx1*psip2(i+1)
      dipdrp = wx0*dipdr(i)+wx1*dipdr(i+1)
      b=1.-tor+tor*bfldp
-     pzp = mims(ns)*u2(m,ns)/b-q(ns)*psp/br0
+     pzp = mims(ns)*u2(ns,m)/b-q(ns)*psp/br0
 
-     rhog=sqrt(2.*b*mu(m,ns)*mims(ns))/(q(ns)*b)*iflr
+     rhog=sqrt(2.*b*mu(ns,m)*mims(ns))/(q(ns)*b)*iflr
 
      rhox(1) = rhog*(1-tor)+rhog*grp*tor
      rhoy(1) = rhog*gxdgyp/grp*tor
@@ -101,8 +100,8 @@ ppush1_start_tm=ppush1_start_tm+MPI_WTIME()
 !$acc loop seq
      do l=1,lr(1)
         !
-        xs=x2(m,ns)+rhox(l) !rwx(1,l)*rhog
-        yt=y2(m,ns)+rhoy(l) !(rwy(1,l)+sz*rwx(1,l))*rhog
+        xs=x2(ns,m)+rhox(l) !rwx(1,l)*rhog
+        yt=y2(ns,m)+rhoy(l) !(rwy(1,l)+sz*rwx(1,l))*rhog
         !
         !   particle can go out of bounds during gyroavg...
         xt=mod(xs+800.*lx,lx)
@@ -121,13 +120,13 @@ ppush1_start_tm=ppush1_start_tm+MPI_WTIME()
      dadzp = dadzp/4.
      aparp = aparp/4.
      !
-     vfac = 0.5*(mims(ns)*u2(m,ns)**2 + 2.*mu(m,ns)*b)
+     vfac = 0.5*(mims(ns)*u2(ns,m)**2 + 2.*mu(ns,m)*b)
      vp0 = 1./b**2*lr0/q0*qhatp*fp/radiusp*grcgtp
      vp0 = vp0*vncp*vexbsw
 
-     vpar = u2(m,ns)-q(ns)/mims(ns)*aparp*nonlin(ns)*0.
+     vpar = u2(ns,m)-q(ns)/mims(ns)*aparp*nonlin(ns)*0.
      bstar = b*(1+mims(ns)*vpar/(q(ns)*b)*bdcrvbp)
-     enerb=(mu(m,ns)+mims(ns)*vpar*vpar/b)/q(ns)*b/bstar*tor
+     enerb=(mu(ns,m)+mims(ns)*vpar*vpar/b)/q(ns)*b/bstar*tor
 
      kap = kapnp - (1.5-vfac/ter)*kaptp-vpar*mims(ns)/ter*vparspp*vparsw
      dum1 = 1./b*lr0/q0*qhatp*fp/radiusp*grcgtp
@@ -144,8 +143,8 @@ ppush1_start_tm=ppush1_start_tm+MPI_WTIME()
           -1./b**2*q0*br0*fp/radiusp*grcgtp*vncp*vexbsw/jfnp &
           -dipdrp/radiusp*mims(ns)*vpar**2/(q(ns)*bstar*b)*q0*br0*grcgtp/jfnp
 
-     pzd0 = tor*(-mu(m,ns)/mims(ns)/radiusp/bfldp*psipp*dbdtp*grcgtp)*b/bstar &
-          +mu(m,ns)*vpar/(q(ns)*bstar*b)*dipdrp/radiusp*dbdtp*grcgtp
+     pzd0 = tor*(-mu(ns,m)/mims(ns)/radiusp/bfldp*psipp*dbdtp*grcgtp)*b/bstar &
+          +mu(ns,m)*vpar/(q(ns)*bstar*b)*dipdrp/radiusp*dbdtp*grcgtp
      pzdot = pzd0 + (q(ns)/mims(ns)*ezp*q0*br0/radiusp/b*psipp*grcgtp/jfnp  &
           +q(ns)/mims(ns)*(-xdot*delbyp+ydot*delbxp+zdot*dadzp))*ipara
 
@@ -154,28 +153,28 @@ ppush1_start_tm=ppush1_start_tm+MPI_WTIME()
           +q(ns)*vpar*(-xdot*delbyp+ydot*delbxp+zdot*dadzp)    &
           -q(ns)*vpar*delbxp*vp0
 
-     x3(m,ns) = x2(m,ns) + 0.5*dt*xdot
-     y3(m,ns) = y2(m,ns) + 0.5*dt*ydot
-     z3(m,ns) = z2(m,ns) + 0.5*dt*zdot
-     u3(m,ns) = u2(m,ns) + 0.5*dt*pzdot
+     x3(ns,m) = x2(ns,m) + 0.5*dt*xdot
+     y3(ns,m) = y2(ns,m) + 0.5*dt*ydot
+     z3(ns,m) = z2(ns,m) + 0.5*dt*zdot
+     u3(ns,m) = u2(ns,m) + 0.5*dt*pzdot
 
-     dum = 1-w2(m,ns)*nonlin(ns)*0.
+     dum = 1-w2(ns,m)*nonlin(ns)*0.
      if(ildu.eq.1)dum = (tgis(ns)/ter)**1.5*exp(vfac*(1/tgis(ns)-1./ter))
      vxdum = (eyp/b+vpar/b*delbxp)*dum1
      !         vxdum = eyp+vpar/b*delbxp
-     w3(m,ns)=w2(m,ns) + 0.5*dt*(vxdum*kap + edot/ter)*dum*xnp
+     w3(ns,m)=w2(ns,m) + 0.5*dt*(vxdum*kap + edot/ter)*dum*xnp
 
-     !         if(x3(m,ns)>lx .or. x3(m,ns)<0.)w3(m,ns) = 0.
+     !         if(x3(ns,m)>lx .or. x3(ns,m)<0.)w3(ns,m) = 0.
 
 
      !if(itube/=1) then
-     !if(abs(pzp-pzi(m,ns))>pzcrit(ns).or.abs(vfac-eki(m,ns))>0.2*eki(m,ns))then
+     !if(abs(pzp-pzi(ns,m))>pzcrit(ns).or.abs(vfac-eki(ns,m))>0.2*eki(ns,m))then
      !   mynopi = mynopi+1
-     !   x3(m,ns) = xii(m,ns)
-     !   z3(m,ns) = z0i(m,ns)
-     !   r = x3(m,ns)-lx/2+lr0
-     !   k = int(z3(m,ns)/delz)
-     !   wz0 = ((k+1)*delz-z3(m,ns))/delz
+     !   x3(ns,m) = xii(ns,m)
+     !   z3(ns,m) = z0i(ns,m)
+     !   r = x3(ns,m)-lx/2+lr0
+     !   k = int(z3(ns,m)/delz)
+     !   wz0 = ((k+1)*delz-z3(ns,m))/delz
      !   wz1 = 1-wz0
      !   th = wz0*thfnz(k)+wz1*thfnz(k+1)
 
@@ -187,168 +186,117 @@ ppush1_start_tm=ppush1_start_tm+MPI_WTIME()
      !   wz1 = 1.-wz0
      !   b = wx0*wz0*bfld(i,k)+wx0*wz1*bfld(i,k+1) &
      !        +wx1*wz0*bfld(i+1,k)+wx1*wz1*bfld(i+1,k+1)
-     !   u3(m,ns) = u0i(m,ns)
-     !   u2(m,ns) = u3(m,ns)
-     !   w3(m,ns) = 0.
-     !   w2(m,ns) = 0.
-     !   x2(m,ns) = x3(m,ns)
-     !   z2(m,ns) = z3(m,ns)
+     !   u3(ns,m) = u0i(ns,m)
+     !   u2(ns,m) = u3(ns,m)
+     !   w3(ns,m) = 0.
+     !   w2(ns,m) = 0.
+     !   x2(ns,m) = x3(ns,m)
+     !   z2(ns,m) = z3(ns,m)
      !end if
      !end if
 
-     laps=anint((z3(m,ns)/lz)-.5)*(1-peritr)
-     r=x3(m,ns)-0.5*lx+lr0
+     laps=anint((z3(ns,m)/lz)-.5)*(1-peritr)
+     r=x3(ns,m)-0.5*lx+lr0
      i = int((r-rin)/dr)
     ! i = min(i,nr-1)
      i = max(i,0)
      wx0 = (rin+(i+1)*dr-r)/dr
      wx1 = 1.-wx0
      qr = wx0*sf(i)+wx1*sf(i+1)
-     y3(m,ns)=mod(y3(m,ns)-laps*2*pi*qr*lr0/q0*sign(1.0,q0)+8000.*ly,ly)
-     if(x3(m,ns)>lx.and.iperidf==0)then
-        x3(m,ns) = lx-1.e-8
-        z3(m,ns)=lz-z3(m,ns)
-        x2(m,ns) = x3(m,ns)
-        z2(m,ns) = z3(m,ns)
-        w2(m,ns) = 0.
-        w3(m,ns) = 0.
+     y3(ns,m)=mod(y3(ns,m)-laps*2*pi*qr*lr0/q0*sign(1.0,q0)+8000.*ly,ly)
+     if(x3(ns,m)>lx.and.iperidf==0)then
+        x3(ns,m) = lx-1.e-8
+        z3(ns,m)=lz-z3(ns,m)
+        x2(ns,m) = x3(ns,m)
+        z2(ns,m) = z3(ns,m)
+        w2(ns,m) = 0.
+        w3(ns,m) = 0.
      end if
-     if(x3(m,ns)<0..and.iperidf==0)then
-        x3(m,ns) = 1.e-8
-        z3(m,ns)=lz-z3(m,ns)
-        x2(m,ns) = x3(m,ns)
-        z2(m,ns) = z3(m,ns)
-        w2(m,ns) = 0.
-        w3(m,ns) = 0.
+     if(x3(ns,m)<0..and.iperidf==0)then
+        x3(ns,m) = 1.e-8
+        z3(ns,m)=lz-z3(ns,m)
+        x2(ns,m) = x3(ns,m)
+        z2(ns,m) = z3(ns,m)
+        w2(ns,m) = 0.
+        w3(ns,m) = 0.
      end if
-     z3(m,ns)=mod(z3(m,ns)+8.*lz,lz)
-     x3(m,ns)=mod(x3(m,ns)+800.*lx,lx)
-     x3(m,ns) = min(x3(m,ns),lx-1.0e-8)
-     y3(m,ns) = min(y3(m,ns),ly-1.0e-8)
-     z3(m,ns) = min(z3(m,ns),lz-1.0e-8)
+     z3(ns,m)=mod(z3(ns,m)+8.*lz,lz)
+     x3(ns,m)=mod(x3(ns,m)+800.*lx,lx)
+     x3(ns,m) = min(x3(ns,m),lx-1.0e-8)
+     y3(ns,m) = min(y3(ns,m),ly-1.0e-8)
+     z3(ns,m) = min(z3(ns,m),lz-1.0e-8)
 
   enddo
 !$acc end parallel
+!$acc wait
 ppush1_end_tm=ppush1_end_tm+MPI_WTIME()
-!!$acc update host(w3,x2,x3,y3,z2,z3,u3,w2)
+!!$acc update host(z3,x2,x3,y2,y3,z2,u2,u3,w2,w3)
   call MPI_ALLREDUCE(mynopi,nopi(ns),1,MPI_integer, &
        MPI_SUM, MPI_COMM_WORLD,ierr)
 
   np_old=mm(ns)
-  !!$acc update host(z3)
-  call test_init_pmove(z3(:,ns),np_old,lz,ierr)
+  !$acc update host(z3)
+  call init_pmove(z3(ns,:),np_old,lz,ierr)
 
-  call test_pmove(x2(:,ns),np_old,np_new,ierr)
+  !$acc update host(x2) async(1)
+  call pmove(x2(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(x3(:,ns),np_old,np_new,ierr)
+  !$acc update device(x2) 
+  !$acc update host(x3) async(1)
+  call pmove(x3(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(y2(:,ns),np_old,np_new,ierr)
+  !$acc update device(x3)
+  !$acc update host(y2) async(1)
+  call pmove(y2(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(y3(:,ns),np_old,np_new,ierr)
+  !$acc update device(y2)
+  !$acc update host(y3) async(1)
+  call pmove(y3(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(z2(:,ns),np_old,np_new,ierr)
+  !$acc update device(y3)
+  !$acc update host(z2) async(1)
+  call pmove(z2(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(z3(:,ns),np_old,np_new,ierr)
+  !$acc update device(z2)
+  call pmove(z3(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(u2(:,ns),np_old,np_new,ierr)
+  !$acc update device(z3)
+  !$acc update host(u2) async(1)
+  call pmove(u2(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(u3(:,ns),np_old,np_new,ierr)
+  !$acc update device(u2)
+  !$acc update host(u3) async(1)
+  call pmove(u3(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(w2(:,ns),np_old,np_new,ierr)
+  !$acc update device(u3)
+  !$acc update host(w2) async(1)
+  call pmove(w2(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(w3(:,ns),np_old,np_new,ierr)
+  !$acc update device(w2)
+  !$acc update host(w3) async(1)
+  call pmove(w3(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(mu(:,ns),np_old,np_new,ierr)
+  !$acc update device(w3)
+  call pmove(mu(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(xii(:,ns),np_old,np_new,ierr)
+  !$acc update device(mu)
+  call pmove(xii(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(z0i(:,ns),np_old,np_new,ierr)
+  !$acc update device(xii)
+  call pmove(z0i(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(pzi(:,ns),np_old,np_new,ierr)
+  !$acc update device(z0i)
+  call pmove(pzi(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(eki(:,ns),np_old,np_new,ierr)
+  !$acc update device(pzi)
+  call pmove(eki(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  call test_pmove(u0i(:,ns),np_old,np_new,ierr)
+  !$acc update device(eki)
+  call pmove(u0i(ns,:),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-
-  !!$acc update host(x2,x3,y2,y3,z2,z3,u2,u3,w2,w3)
-  
-
-  !!$acc update host(x2) async(1)
-  !call pmove(x2(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(x2) 
-  !!$acc update host(x3) async(1)
-  !call pmove(x3(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(x3)
-  !!$acc update host(y2) async(1)
-  !call pmove(y2(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(y2)
-  !!$acc update host(y3) async(1)
-  !call pmove(y3(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(y3)
-  !!$acc update host(z2) async(1)
-  !call pmove(z2(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(z2)
-  !call pmove(z3(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(z3)
-  !!$acc update host(u2) async(1)
-  !call pmove(u2(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(u2)
-  !!$acc update host(u3) async(1)
-  !call pmove(u3(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(u3)
-  !!$acc update host(w2) async(1)
-  !call pmove(w2(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(w2)
-  !!$acc update host(w3) async(1)
-  !call pmove(w3(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(w3)
-  !call pmove(mu(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(mu)
-  !call pmove(xii(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(xii)
-  !call pmove(z0i(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(z0i)
-  !call pmove(pzi(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(pzi)
-  !call pmove(eki(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(eki)
-  !call pmove(u0i(:,ns),np_old,np_new,ierr)
-  !if (ierr.ne.0) call ppexit
-  !!$acc update device(u0i)
-  !!$acc wait(1)
-  !!!$acc update device(w3,x2,x3,y2,y3,z2,z3,u2,u3,w2,mu,xii,z0i,pzi,eki,u0i)
-
+  !$acc update device(u0i)
+  !$acc wait(1)
+  !!$acc update device(z3,x2,x3,y2,y3,z2,z3,u2,u3,w2,mu,xii,z0i,pzi,eki,u0i)
   call end_pmove(ierr)
   mm(ns)=np_new
 
