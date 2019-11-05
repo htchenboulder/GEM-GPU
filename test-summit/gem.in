@@ -8,13 +8,13 @@
  2.23      6.96      2.23      6.96      0.       0.      1.0e-08
  
 'IMX   JMX   KMX    MMX     mmxe    nmx    nsmx modemx NTUBE icxs_sec ipg isphi'
- 128    64   42    1228800   800000  100000  2     4      64     0    100  1
+ 128    64   42    1638400   800000  100000  3     4      64     0    100  1
 
 'LXA  lymult  delra  delri delre delrn  nrst  eprs nlow  jcnt'
  0.40   7     0.05    0.0   0.0   0.0   1000   0.0  0    17
 
 'DT      NM     nsm     xshape  yshape  zshape'
- 10.   10     1       1.0     1.0     137.44
+ 10.   10    1       1.0     1.0     137.44
 
 'iput iget ision isiap   peritr llk mlk onemd izonal adiabatic_electron ineq0   iflut'
   1    0     1     0       0     0   1    1     1        1                1       1
