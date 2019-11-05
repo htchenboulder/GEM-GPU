@@ -1,9 +1,12 @@
 subroutine cpush(n,ns)
+!!n means n-th timestep, ns is the specific ion species.
 
   use gem_com
   use gem_equil
+  use openacc
   implicit none
   INTEGER :: n
+  INTEGER :: is_present
   real :: phip,exp1,eyp,ezp,delbxp,delbyp,dpdzp,dadzp,aparp
   real :: wx0,wx1,wy0,wy1,wz0,wz1,w3old
   INTEGER :: m,i,j,k,ns,l
@@ -18,6 +21,8 @@ subroutine cpush(n,ns)
   real :: sbuf(10),rbuf(10)
   real :: dbdrp,dbdtp,grcgtp,bfldp,fp,radiusp,dydrp,qhatp,psipp,jfnp,grdgtp
   real :: grp,gxdgyp,rhox(4),rhoy(4),psp,pzp,vncp,vparspp,psip2p,bdcrvbp,curvbzp,dipdrp
+
+  
 
   sbuf(1:10) = 0.
   rbuf(1:10) = 0.
@@ -36,10 +41,10 @@ subroutine cpush(n,ns)
 cpush1_start_tm=cpush1_start_tm+MPI_WTIME()
 !$acc parallel loop gang vector private(rhox,rhoy)
   do m=1,mm(ns)
-     r=x3(ns,m)-0.5*lx+lr0
+     r=x3(m,ns)-0.5*lx+lr0
 
-     k = int(z3(ns,m)/delz)
-     wz0 = ((k+1)*delz-z3(ns,m))/delz
+     k = int(z3(m,ns)/delz)
+     wz0 = ((k+1)*delz-z3(m,ns))/delz
      wz1 = 1-wz0
      th = wz0*thfnz(k)+wz1*thfnz(k+1)
 
@@ -86,11 +91,11 @@ cpush1_start_tm=cpush1_start_tm+MPI_WTIME()
      b=1.-tor+tor*bfldp
      psip2p = wx0*psip2(i)+wx1*psip2(i+1)
      dipdrp = wx0*dipdr(i)+wx1*dipdr(i+1)
-     pzp = mims(ns)*u3(ns,m)/b-q(ns)*psp/br0
+     pzp = mims(ns)*u3(m,ns)/b-q(ns)*psp/br0
      vncp = wx0*phincp(i)+wx1*phincp(i+1)
      vparspp = wx0*vparsp(ns,i)+wx1*vparsp(ns,i+1)
 
-     rhog=sqrt(2.*b*mu(ns,m)*mims(ns))/(q(ns)*b)*iflr
+     rhog=sqrt(2.*b*mu(m,ns)*mims(ns))/(q(ns)*b)*iflr
 
      rhox(1) = rhog*(1-tor)+rhog*grp*tor
      rhoy(1) = rhog*gxdgyp/grp*tor
@@ -116,11 +121,11 @@ cpush1_start_tm=cpush1_start_tm+MPI_WTIME()
      !  4 pt. avg. written out explicitly for vectorization...
 !$acc loop seq
      do l=1,lr(1)
-        xs=x3(ns,m)+rhox(l) !rwx(1,l)*rhog
-        yt=y3(ns,m)+rhoy(l) !(rwy(1,l)+sz*rwx(1,l))*rhog
+        xs=x3(m,ns)+rhox(l) !rwx(1,l)*rhog
+        yt=y3(m,ns)+rhoy(l) !(rwy(1,l)+sz*rwx(1,l))*rhog
         !   BOUNDARY
-        xt=mod(xs+800.*lx,lx)
-        yt=mod(yt+800.*ly,ly)
+        xt=modulo(xs+800.*lx,lx)
+        yt=modulo(yt+800.*ly,ly)
         xt = min(xt,lx-1.0e-8)
         yt = min(yt,ly-1.0e-8)
 
@@ -137,13 +142,13 @@ cpush1_start_tm=cpush1_start_tm+MPI_WTIME()
      aparp = aparp/4.
 
 
-     vfac = 0.5*(mims(ns)*u3(ns,m)**2 + 2.*mu(ns,m)*b)
+     vfac = 0.5*(mims(ns)*u3(m,ns)**2 + 2.*mu(m,ns)*b)
      vp0 = 1./b**2*lr0/q0*qhatp*fp/radiusp*grcgtp
      vp0 = vp0*vncp*vexbsw
 
-     vpar = u3(ns,m)-q(ns)/mims(ns)*aparp*nonlin(ns)*0.
+     vpar = u3(m,ns)-q(ns)/mims(ns)*aparp*nonlin(ns)*0.
      bstar = b*(1+mims(ns)*vpar/(q(ns)*b)*bdcrvbp)
-     enerb=(mu(ns,m)+mims(ns)*vpar*vpar/b)/q(ns)*b/bstar*tor
+     enerb=(mu(m,ns)+mims(ns)*vpar*vpar/b)/q(ns)*b/bstar*tor
 
      kap = kapnp - (1.5-vfac/ter)*kaptp-vpar*mims(ns)/ter*vparspp*vparsw
      dum1 = 1./b*lr0/q0*qhatp*fp/radiusp*grcgtp
@@ -160,8 +165,8 @@ cpush1_start_tm=cpush1_start_tm+MPI_WTIME()
           -1./b**2*q0*br0*fp/radiusp*grcgtp*vncp*vexbsw/jfnp &
           -dipdrp/radiusp*mims(ns)*vpar**2/(q(ns)*bstar*b)*q0*br0*grcgtp/jfnp
 
-     pzd0 = tor*(-mu(ns,m)/mims(ns)/radiusp/bfldp*psipp*dbdtp*grcgtp)*b/bstar &
-          +mu(ns,m)*vpar/(q(ns)*bstar*b)*dipdrp/radiusp*dbdtp*grcgtp
+     pzd0 = tor*(-mu(m,ns)/mims(ns)/radiusp/bfldp*psipp*dbdtp*grcgtp)*b/bstar &
+          +mu(m,ns)*vpar/(q(ns)*bstar*b)*dipdrp/radiusp*dbdtp*grcgtp
      pzdot = pzd0 + (q(ns)/mims(ns)*ezp*q0*br0/radiusp/b*psipp*grcgtp/jfnp  &
           +q(ns)/mims(ns)*(-xdot*delbyp+ydot*delbxp+zdot*dadzp))*ipara
 
@@ -170,79 +175,84 @@ cpush1_start_tm=cpush1_start_tm+MPI_WTIME()
           +q(ns)*vpar*(-xdot*delbyp+ydot*delbxp+zdot*dadzp)   &
           -q(ns)*vpar*delbxp*vp0
 
-     x3(ns,m) = x2(ns,m) + dt*xdot
-     y3(ns,m) = y2(ns,m) + dt*ydot
-     z3(ns,m) = z2(ns,m) + dt*zdot
-     u3(ns,m) = u2(ns,m) + dt*pzdot
+     x3(m,ns) = x2(m,ns) + dt*xdot
+     y3(m,ns) = y2(m,ns) + dt*ydot
+     z3(m,ns) = z2(m,ns) + dt*zdot
+     u3(m,ns) = u2(m,ns) + dt*pzdot
 
-     dum = 1-w3(ns,m)*nonlin(ns)*0.
+     dum = 1-w3(m,ns)*nonlin(ns)*0.
      if(ildu.eq.1)dum = (tgis(ns)/ter)**1.5*exp(vfac*(1/tgis(ns)-1./ter))
      !         vxdum = eyp+vpar/b*delbxp
      vxdum = (eyp/b+vpar/b*delbxp)*dum1
-     w3old = w3(ns,m)
-     w3(ns,m) = w2(ns,m) + dt*(vxdum*kap+edot/ter)*dum*xnp
+     w3old = w3(m,ns)
+     w3(m,ns) = w2(m,ns) + dt*(vxdum*kap+edot/ter)*dum*xnp
 
-     if(abs(w3(ns,m)).gt.1.0.and.nonlin(ns)==1)then
-        w3(ns,m) = 0.
-        w2(ns,m) = 0.
+     if(abs(w3(m,ns)).gt.1.0.and.nonlin(ns)==1)then
+        w3(m,ns) = 0.
+        w2(m,ns) = 0.
      end if
 
-     laps=anint((z3(ns,m)/lz)-.5)*(1-peritr)
-     r=x3(ns,m)-0.5*lx+lr0
+     laps=anint((z3(m,ns)/lz)-.5)*(1-peritr)
+     r=x3(m,ns)-0.5*lx+lr0
      i = int((r-rin)/dr)
      i = min(i,nr-1)
      i = max(i,0)
      wx0 = (rin+(i+1)*dr-r)/dr
      wx1 = 1.-wx0
      qr = wx0*sf(i)+wx1*sf(i+1)
-     y3(ns,m)=mod(y3(ns,m)-laps*2*pi*qr*lr0/q0*sign(1.0,q0)+8000.*ly,ly)
-     if(x3(ns,m)>lx.and.iperidf==0)then
-        x3(ns,m) = lx-1.e-8
-        z3(ns,m)=lz-z3(ns,m)
-        x2(ns,m) = x3(ns,m)
-        z2(ns,m) = z3(ns,m)
-        w2(ns,m) = 0.
-        w3(ns,m) = 0.
+     y3(m,ns)=modulo(y3(m,ns)-laps*2*pi*qr*lr0/q0*sign(1.0,q0)+8000.*ly,ly)
+     if(x3(m,ns)>lx.and.iperidf==0)then
+        x3(m,ns) = lx-1.e-8
+        z3(m,ns)=lz-z3(m,ns)
+        x2(m,ns) = x3(m,ns)
+        z2(m,ns) = z3(m,ns)
+        w2(m,ns) = 0.
+        w3(m,ns) = 0.
      end if
-     if(x3(ns,m)<0..and.iperidf==0)then
-        x3(ns,m) = 1.e-8
-        z3(ns,m)=lz-z3(ns,m)
-        x2(ns,m) = x3(ns,m)
-        z2(ns,m) = z3(ns,m)
-        w2(ns,m) = 0.
-        w3(ns,m) = 0.
+     if(x3(m,ns)<0..and.iperidf==0)then
+        x3(m,ns) = 1.e-8
+        z3(m,ns)=lz-z3(m,ns)
+        x2(m,ns) = x3(m,ns)
+        z2(m,ns) = z3(m,ns)
+        w2(m,ns) = 0.
+        w3(m,ns) = 0.
      end if
-     z3(ns,m)=mod(z3(ns,m)+8.*lz,lz)
-     x3(ns,m)=mod(x3(ns,m)+800.*lx,lx)
-     x3(ns,m) = min(x3(ns,m),lx-1.0e-8)
-     y3(ns,m) = min(y3(ns,m),ly-1.0e-8)
-     z3(ns,m) = min(z3(ns,m),lz-1.0e-8)
+     z3(m,ns)=modulo(z3(m,ns)+8.*lz,lz)
+     x3(m,ns)=modulo(x3(m,ns)+800.*lx,lx)
+     x3(m,ns) = min(x3(m,ns),lx-1.0e-8)
+     y3(m,ns) = min(y3(m,ns),ly-1.0e-8)
+     z3(m,ns) = min(z3(m,ns),lz-1.0e-8)
 
      !     particle diagnostics done here because info is available...
-     k = int(x3(ns,m)/(lx/nsubd))
+     k = int(x3(m,ns)/(lx/nsubd))
      k = min(k,nsubd-1)
      k = k+1
      mypfl_es(k)=mypfl_es(k) + w3old*(eyp)
      mypfl_em(k)=mypfl_em(k) + w3old*(vpar*delbxp/b)
      myefl_es(k)=myefl_es(k) + vfac*w3old*(eyp)
      myefl_em(k)=myefl_em(k) + vfac*w3old*(vpar*delbxp/b)
-     myke=myke + vfac*w3(ns,m)
-     mynos=mynos + w3(ns,m)
-     myavewi = myavewi+abs(w3(ns,m))
+     myke=myke + vfac*w3(m,ns)
+     mynos=mynos + w3(m,ns)
+     myavewi = myavewi+abs(w3(m,ns))
 
      !     xn+1 becomes xn...
-     u2(ns,m)=u3(ns,m)
-     x2(ns,m)=x3(ns,m)
-     y2(ns,m)=y3(ns,m)
-     z2(ns,m)=z3(ns,m)
-     w2(ns,m)=w3(ns,m)
+     u2(m,ns)=u3(m,ns)
+     x2(m,ns)=x3(m,ns)
+     y2(m,ns)=y3(m,ns)
+     z2(m,ns)=z3(m,ns)
+     w2(m,ns)=w3(m,ns)
 
      !     100     continue
   enddo
 !$acc end parallel
-!$acc wait
+
+
 cpush1_end_tm=cpush1_end_tm+MPI_WTIME()
-!$acc update host(z3,x2,x3,y2,y3,z2,u2,u3,w2,w3)
+!!$acc update host(w3,x2,x3,y2,y3,z2,z3,u2,u3,w2)
+!!$acc update host(z3)
+!!!scaling not bad: 250-313 take 0.0038s in 4 nodes, 0.0036s in 16 nodes 
+
+
 
   sbuf(1)=myke
   sbuf(2)=myefl_es(nsubd/2)
@@ -257,12 +267,11 @@ cpush1_end_tm=cpush1_end_tm+MPI_WTIME()
   efltemp=rbuf(2)
   pfltemp=rbuf(3)
   nostemp=rbuf(4)
-  !if(myid ==0 )write(*,*) 'before cpush tmm', real(tmm(1)),real(tmm(1),8)
-  !call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-  avewi(ns,n) = (rbuf(5)/ real(tmm(1)))/real(ntube) 
-  nos(1,n)=(nostemp/ real(tmm(1)))/real(ntube) 
+  !!!new definition of tmm(1) (htc)
+  avewi(ns,n) = (rbuf(5)/real(tmm(1)))/real(ntube) 
+  nos(1,n)=(nostemp/real(tmm(1)))/real(ntube) 
   ke(1,n)=(ketemp/( 2.*real(tmm(1))*mims(ns) ))/real(ntube)
-  !if(myid ==0 )write(*,*) 'after cpush tmm', real(tmm(1)),real(tmm(1),8)
+  
 
   call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
@@ -270,6 +279,7 @@ cpush1_end_tm=cpush1_end_tm+MPI_WTIME()
   call MPI_ALLREDUCE(sbuf,rbuf,10,  &
        MPI_REAL8,MPI_SUM,  &
        MPI_COMM_WORLD,ierr)
+  !!!new definition of tmm(1) (htc)
   do k = 1,nsubd
      efl_es(ns,k,n)=(rbuf(k)/ real(tmm(1)))/real(ntube) *totvol/vol(k)*cn0s(ns)
   end do
@@ -278,6 +288,7 @@ cpush1_end_tm=cpush1_end_tm+MPI_WTIME()
   call MPI_ALLREDUCE(sbuf,rbuf,10,  &
        MPI_REAL8,MPI_SUM,  &
        MPI_COMM_WORLD,ierr)
+  !!!new definition of tmm(1) (htc)
   do k = 1,nsubd
      efl_em(ns,k,n)=(rbuf(k)/ real(tmm(1)))/real(ntube) *totvol/vol(k)*cn0s(ns)
   end do
@@ -286,6 +297,7 @@ cpush1_end_tm=cpush1_end_tm+MPI_WTIME()
   call MPI_ALLREDUCE(sbuf,rbuf,10,  &
        MPI_REAL8,MPI_SUM,  &
        MPI_COMM_WORLD,ierr)
+  !!!new definition of tmm(1) (htc)
   do k = 1,nsubd
      pfl_es(ns,k,n)=(rbuf(k)/ real(tmm(1)))/real(ntube) *totvol/vol(k)*cn0s(ns)
   end do
@@ -294,6 +306,7 @@ cpush1_end_tm=cpush1_end_tm+MPI_WTIME()
   call MPI_ALLREDUCE(sbuf,rbuf,10,  &
        MPI_REAL8,MPI_SUM,  &
        MPI_COMM_WORLD,ierr)
+  !!!new definition of tmm(1) (htc)
   do k = 1,nsubd
      pfl_em(ns,k,n)=(rbuf(k)/ real(tmm(1)))/real(ntube) *totvol/vol(k)*cn0s(ns)
   end do
@@ -303,58 +316,117 @@ cpush1_end_tm=cpush1_end_tm+MPI_WTIME()
 
   np_old=mm(ns)
   call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-  call init_pmove(z3(ns,:),np_old,lz,ierr)
+  call test_init_pmove(z3(:,ns),np_old,lz,ierr)
   
-  !$acc update device(z3) 
-  call pmove(x2(ns,:),np_old,np_new,ierr)
+  
+
+
+
+  call test_pmove(x2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(x2)
-  call pmove(x3(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(x3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(x3)
-  call pmove(y2(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(y2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(y2)
-  call pmove(y3(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(y3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(y3)
-  call pmove(z2(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(z2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z2)
-  call pmove(z3(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(z3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z3)
-  call pmove(u2(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(u2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u2)
-  call pmove(u3(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(u3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u3)
-  call pmove(w2(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(w2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(w2)
-  call pmove(w3(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(w3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(w3)
-  call pmove(mu(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(mu(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(mu)
-  call pmove(xii(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(xii(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(xii)
-  call pmove(z0i(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(z0i(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z0i)
-  call pmove(pzi(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(pzi(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(pzi)
-  call pmove(eki(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(eki(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(eki)
-  call pmove(u0i(ns,:),np_old,np_new,ierr)
+
+  call test_pmove(u0i(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u0i)
-  !$acc wait
+
+  !!$acc update host(x2,x3,y2,y3,z2,z3,u2,u3,w2,w3)
+
+
+
+
+  !call pmove(x2(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(x2)
+
+  !call pmove(x3(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(x3)
+
+  !call pmove(y2(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(y2)
+  !call pmove(y3(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(y3)
+  !call pmove(z2(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(z2)
+  !call pmove(z3(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(z3)
+  !call pmove(u2(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(u2)
+  !call pmove(u3(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(u3)
+  !call pmove(w2(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(w2)
+  !call pmove(w3(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(w3)
+  !call pmove(mu(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(mu)
+  !call pmove(xii(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(xii)
+  !call pmove(z0i(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(z0i)
+  !call pmove(pzi(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(pzi)
+  !call pmove(eki(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(eki)
+  !call pmove(u0i(:,ns),np_old,np_new,ierr)
+  !if (ierr.ne.0) call ppexit
+  !!$acc update device(u0i)
+
+
   call end_pmove(ierr)
   mm(ns)=np_new
   !     write(*,*)MyId,mm(ns)

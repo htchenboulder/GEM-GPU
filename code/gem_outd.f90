@@ -6,12 +6,12 @@ subroutine outd(n)
   INTEGER :: n,np
   integer :: i,j,k
 
-  if ( (mod(n,imovie).eq.0) ) then
+  if ( (modulo(n,imovie).eq.0) ) then
      call mphxy(phi(:,:,:),'mphxy',25)
      call mphxz(phi(:,:,:),'mphxz',26)
   endif
 
-  if (mod(n,nplot).eq.0) then
+  if (modulo(n,nplot).eq.0) then
      !         call phixy(rho,'rhoxy',27,n)
      !         call phixz(rho,'rhoxz',28,n)
 
@@ -649,7 +649,7 @@ subroutine pol2d
 
            yt = wr0*wz0*yfn(i1,j1)+wr0*wz1*yfn(i1,j1+1) &
                 +wr1*wz0*yfn(i1+1,j1)+wr1*wz1*yfn(i1+1,j1+1) 
-           yt = mod(yt+800.0*ly,ly)    
+           yt = modulo(yt+800.0*ly,ly)    
            zt = wz0*zfnth(j1)+wz1*zfnth(j1+1)
            zt = min(zt,lz-1.e-2)
            xt = r-rin

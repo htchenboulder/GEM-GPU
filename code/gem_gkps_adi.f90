@@ -27,7 +27,7 @@ subroutine gkps_adiabatic_electron(nstep,ip)
   ! the local variables for field solver
   integer :: myj
   real :: u(0:imx,0:jmx,0:1),u_zonal(0:imx,0:jmx,0:1), &
-          rho_zonal_tmp(0:imx,0:1),rho_zonal(0:imx,0:1),jacob_rho_tmp(0:imx,0:1),jacob_rho(0:imx,0:1)
+          rho_zonal_tmp(0:imx,0:1),rho_zonal(0:imx,0:1),jacob_rho_tmp(0:imx,0:1),jacob_rho(0:imx,0:1),start_allreduce
   complex :: v(0:imx-1,0:jcnt-1,0:1),v_zonal(0:imx-1,0:jcnt-1,0:1),sl(1:imx-1,0:jcnt-1,0:1),temp3dxy(0:imx-1,0:jmx-1,0:1)
  
   ! save the global variables
@@ -188,7 +188,7 @@ subroutine gkps_adiabatic_electron(nstep,ip)
     enddo
 !$acc end kernels
 
-     ! flux average of mx0
+     ! flux average of mx0 !!!bad scaling: 192-200 takes 0.1s in 4 nodes, 0.26s in 16 nodes (htc)
      mx_tmp=0.0
      icount=(imx-1)*(imx-1)*jcnt*2        
      call MPI_ALLREDUCE(mx_zonal,mx_tmp,icount,MPI_DOUBLE_COMPLEX,MPI_SUM,TUBE_COMM,ierr)
@@ -213,7 +213,7 @@ subroutine gkps_adiabatic_electron(nstep,ip)
      mx_zonal(:,:,0,:)=cmplx(real(mx_zonal(:,:,0,:)),0.0)
      mx(:,:,0,:)=cmplx(real(mx(:,:,0,:)),0.0)
 !$acc end kernels
-
+!!!bad scaling: 215-256 taks 0.166s in 4 nodes, 0.303s in 16 nodes (htc)
      do k=0,1
         do j=0,jcnt-1
            call ZGETRF(imx-1,imx-1,mx(:,:,j,k),imx-1,ipiv(:,:,j,k),INFO )
@@ -245,7 +245,8 @@ subroutine gkps_adiabatic_electron(nstep,ip)
 
 200  ifirst=-99
   endif
-
+  call MPI_barrier(mpi_comm_world,ierr)
+  !!! lines before this line are initialization
   poisson0_end_tm=poisson0_end_tm+MPI_WTIME()
 
   if(idg==1)write(*,*)'pass form factors'
@@ -266,6 +267,9 @@ subroutine gkps_adiabatic_electron(nstep,ip)
   enddo
 !$acc end kernels
 
+!!!allreduce takes a lot time, bad scaling: 270-282 take 0.144s in 4 nodes, 0.399 in 16 nodes
+!start_allreduce=MPI_WTIME()
+!if(myid==0)write(*,*)'before allreduce'
   rho_zonal=0.0
   icount=(im+1)*2
   call MPI_ALLREDUCE(rho_zonal_tmp,rho_zonal,icount,MPI_REAL8,MPI_SUM,mpi_comm_world,ierr)
@@ -277,7 +281,8 @@ subroutine gkps_adiabatic_electron(nstep,ip)
         rho_zonal(i,k)=rho_zonal(i,k)/jacob_rho(i,k)
      enddo
   enddo
- 
+!if(myid==0)write(*,*)'after allreduce',MPI_WTIME()-start_allreduce
+
   ! different source term for zonal and non-zonal term
 !$acc kernels
   do i=0,nxpp

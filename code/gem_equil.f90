@@ -616,6 +616,7 @@ contains
       do j = 0,ntheta
          jfn(j) = dum/jfn(j)
       end do
+      !!!uniform theta domain (htc)
       jfn = 1.
  300  continue
 

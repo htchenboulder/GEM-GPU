@@ -20,6 +20,7 @@ program gem_main
   end if
 
   if(isft==1)then
+          !!!without wtime (htc)
      call ftcamp
      goto 100
   end if
@@ -62,7 +63,9 @@ program gem_main
 
   end do
   lasttm=MPI_WTIME()
-  call ftcamp
+  !ftcamp_start_tm=ftcamp_start_tm+MPI_WTIME()
+  !call ftcamp
+  !ftcamp_end_tm=ftcamp_end_tm+MPI_WTIME()
   tottm=lasttm-starttm
   accumulate_tot_tm=accumulate_end_tm-accumulate_start_tm
   poisson_tot_tm=poisson_end_tm-poisson_start_tm
@@ -99,7 +102,7 @@ subroutine hybinit
   implicit none
   GCLR = int(MyId/ntube)
   GLST = numprocs/ntube-1
-  TCLR = mod(MyId,ntube)
+  TCLR = modulo(MyId,ntube)
   TLST = ntube-1
 
   !***MPI variables
@@ -129,8 +132,8 @@ subroutine init
   implicit none
   character(len=62) dumchar
   INTEGER :: i,j,k,m,n,ns,idum,i1,j1,k1
-  INTEGER :: mm1
-  INTEGER :: mm2,lr1
+  INTEGER ::mm1
+  INTEGER ::mm2,lr1
   real :: mims1,tets1,q1,kappan,kappat,r,qr,th,cost,dum,zdum
   real :: dbdrp,dbdtp,grcgtp,bfldp,fp,radiusp,dydrp,qhatp,psipp
   real :: grp,gxdgyp,jacp,jfnp,gn0ep,gt0ep,gt0ip,grdgtp,gthp
@@ -240,7 +243,6 @@ subroutine init
      fradi = cn0e*xn0e(nr/2)/t0e(nr/2)
   end if
 
-  write(*,*) 'begin id', MyId
   !     begin reading species info, ns=1,nsm...
   if(nsm.le.0) write(*,*)'invalid nsm',nsm
   read(115,*) dumchar
@@ -251,15 +253,16 @@ subroutine init
   !$acc update device(mims,q)
   read(115,*) dumchar
   read(115,*)iflr,iorb
-  write(*,*) 'zeroth Id ', MyId,'mm1', mm1, 'mm2',mm2
+  !!!mm1 in the new version of gem is the particle number per ntube
   tmm(1)=mm1
   tmm(2)=mm2
-  write(*,*) 'first Id ', MyId,'tmm', tmm,'mm1', mm1, 'mm2',mm2
   mm(:)=int(mm1/numprocs)*ntube
   mme = int(mm2/numprocs)
-  write(*,*) 'second Id ', MyId,'numprocs',numprocs, 'mm1 ', mm1,'mm2 ', mm2, 'tmm', tmm,'mm', mm, 'mme',mme
-  if (MyId.eq.Last) mm(ns)=int(real(mm1)*real(ntube)-real(Last)*real(mm(ns)))
-  write(*,*)'in init  ',Myid,mm(ns)
+  !!!mm1 in the new version of gem is the particle number per ntube
+  !if (MyId.eq.Last) mm(ns)=int(mm1-int(Last,8)*int(mm(ns),8),4)
+  if (MyId.eq.Last) mm(ns)=int(mm1-int(mm1/numprocs)*Last)*ntube
+  
+       !write(*,*)'in init  ',Myid,mm1-int8(Last)*int8(mm(ns)),mm(ns)
   tets(1)=1
   lr(1)=lr1
   lr(2)=lr1
@@ -289,7 +292,6 @@ subroutine init
 
   e0=lr0/q0/br0
   !     
-  write(*,*) 'id', myid, 'before do loop'
   do i=0,nxpp
      xg(i)=i*dx !dx*(tclr*nxpp+i)
   enddo
@@ -314,7 +316,7 @@ subroutine init
         isgnft(m) = 1
         jft(m) = 0
      end if
-     if(m>0.and.mod(m,2)==0)then
+     if(m>0.and.modulo(m,2)==0)then
         isgnft(m) = -1
         jft(m) = jmx-j1
      end if
@@ -335,7 +337,6 @@ subroutine init
   nmode(4)=km/2
 
   !     initialize bfld   
-  write(*,*) 'initialize bfld'
 
   zfnth(0) = 0.
   do j = 1,ntheta
@@ -467,7 +468,6 @@ subroutine init
   !$acc update device(phi)
   !if ES only
   !$acc update device(apar,dpdz,delby,delbx,dadz)
-  write(*,*) 'id', myid, 'after do loop'
 
   if(myid.eq.master)then
      write(*,*)zfnth(ntheta),thfnz(ntheta/2),thfnz(ntheta/2+1)
@@ -634,15 +634,15 @@ subroutine restart(iflag,n)
      do ns = 1,nsm
         read(139+MyId)mm(ns)
         do m=1,mm(ns)
-           read(139+MyId) mu(ns,m)
-           read(139+MyId) x2(ns,m),y2(ns,m),z2(ns,m),u2(ns,m),w2(ns,m)
-           read(139+MyId) xii(ns,m),z0i(ns,m),pzi(ns,m),eki(ns,m),u0i(ns,m)
-           w2(ns,m)=w2(ns,m)/cut
-           x3(ns,m)=x2(ns,m)
-           y3(ns,m)=y2(ns,m)
-           z3(ns,m)=z2(ns,m)
-           u3(ns,m)=u2(ns,m)
-           w3(ns,m)=w2(ns,m)
+           read(139+MyId) mu(m,ns)
+           read(139+MyId) x2(m,ns),y2(m,ns),z2(m,ns),u2(m,ns),w2(m,ns)
+           read(139+MyId) xii(m,ns),z0i(m,ns),pzi(m,ns),eki(m,ns),u0i(m,ns)
+           w2(m,ns)=w2(m,ns)/cut
+           x3(m,ns)=x2(m,ns)
+           y3(m,ns)=y2(m,ns)
+           z3(m,ns)=z2(m,ns)
+           u3(m,ns)=u2(m,ns)
+           w3(m,ns)=w2(m,ns)
         enddo
      end do
 120  continue
@@ -675,9 +675,9 @@ subroutine restart(iflag,n)
      do ns = 1,nsm
         write(139+MyId)mm(ns)
         do m=1,mm(ns)
-           write(139+MyId) mu(ns,m)
-           write(139+MyId) x2(ns,m),y2(ns,m),z2(ns,m),u2(ns,m),w2(ns,m)
-           write(139+MyId) xii(ns,m),z0i(ns,m),pzi(ns,m),eki(ns,m),u0i(ns,m)
+           write(139+MyId) mu(m,ns)
+           write(139+MyId) x2(m,ns),y2(m,ns),z2(m,ns),u2(m,ns),w2(m,ns)
+           write(139+MyId) xii(m,ns),z0i(m,ns),pzi(m,ns),eki(m,ns),u0i(m,ns)
         enddo
      end do
 
@@ -702,12 +702,19 @@ end subroutine restart
 !        Version 2 does it Willy's way...
 
 subroutine parperp(vpar,vperp2,m,pi,cnt,MyId)
-
+  use gem_com, only : iseed2
   INTERFACE
-     real function revers(num,n)
-       integer :: num,n
-     end function revers
+     real function ran(i)
+       integer :: i
+     end function ran
   END INTERFACE
+        
+
+  !INTERFACE
+     !real function revers(num,n)
+       !integer :: num,n
+     !end function revers
+  !END INTERFACE
 
   real :: vpar,vperp2,r1,r2,t,pi
   INTEGER :: m,iflag,cnt,MyId
@@ -717,8 +724,13 @@ subroutine parperp(vpar,vperp2,m,pi,cnt,MyId)
   data d1,d2,d3/1.432788,0.189269,0.001308/
 
 
-  r1=revers(m+MyId*cnt,7)
-  r2=revers(m+MyId*cnt,11)
+  !r1=revers(m+MyId*cnt,7)
+  !r2=revers(m+MyId*cnt,11)
+
+  !!!random generator for large particle number myid*cnt>2*10^31(htc)
+  r1=ran(iseed2)
+  r2=ran(iseed2)
+  
 
 
   !.....quiet start---see denavit pf '71(?) & abramowitz hand book
@@ -769,10 +781,10 @@ subroutine weight
         wx0 = (rin+(j+1)*dr-r)/dr
         wx1 = 1.-wx0
         qr = wx0*sf(j)+wx1*sf(j+1)
-        dely=mod(2.*pi*lr0/q0*qr*sign(1.0,q0)+800.0*ly,ly)
+        dely=modulo(2.*pi*lr0/q0*qr*sign(1.0,q0)+800.0*ly,ly)
         deljp(i)=int(dely/dy)
         deljm(i)=0
-        aweight=mod(dely,dy)
+        aweight=modulo(dely,dy)
         weightp(i)=1.-aweight/dy
         weightm(i)=1.
      enddo
@@ -784,10 +796,10 @@ subroutine weight
         wx0 = (rin+(j+1)*dr-r)/dr
         wx1 = 1.-wx0
         qr = wx0*sf(j)+wx1*sf(j+1)
-        dely=mod(2.*pi*lr0/q0*qr*sign(1.0,q0)+800.*ly,ly)
+        dely=modulo(2.*pi*lr0/q0*qr*sign(1.0,q0)+800.*ly,ly)
         deljm(i)=int(dely/dy)
         deljp(i)=0
-        aweight=mod(dely,dy)
+        aweight=modulo(dely,dy)
         weightm(i)=1.-aweight/dy
         weightp(i)=1.
      enddo
@@ -802,10 +814,10 @@ subroutine weight
 
   do j=0,jm
      do i=0,im
-        jpl(i,j)=mod(j+deljp(i)+8*jm,jm)
-        jpn(i,j)=mod(j+deljp(i)+1+8*jm,jm)
-        jmi(i,j)=mod(j-deljm(i)+8*jm,jm)
-        jmn(i,j)=mod(j-deljm(i)-1+8*jm,jm)
+        jpl(i,j)=modulo(j+deljp(i)+8*jm,jm)
+        jpn(i,j)=modulo(j+deljp(i)+1+8*jm,jm)
+        jmi(i,j)=modulo(j-deljm(i)+8*jm,jm)
+        jmn(i,j)=modulo(j-deljm(i)-1+8*jm,jm)
         weightpn(i)=1.-weightp(i)
         weightmn(i)=1.-weightm(i)
      enddo
@@ -905,7 +917,7 @@ subroutine spec(n)
   efb_em = 0.
   pfb_em = 0.
   k = 2
-  x =real(nsubd)/real(nsubd-2*k)
+  x = real(nsubd)/real(nsubd-2*k)
   do j = 1+k,nsubd-k
      pf = pf+pfle_es(j,n)*vol(j)/totvol*x
      efe = efe+efle_es(j,n)*vol(j)/totvol*x
@@ -987,6 +999,30 @@ subroutine spec(n)
 end subroutine spec
 
 !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+!!!new fast random generator (htc)
+real function ran(idum)
+        !integer, parameter :: k8b=selected_int_kind(18)
+        integer,intent(inout) :: idum
+        integer,parameter :: IA=16807, IM=2147483647,IQ=127773,IR=2836
+        real, save :: am
+        integer, save :: ix=-1, iy=-1,k
+        
+        if (idum <= 0 .or. iy<0) then
+                am=nearest(1.0,-1.0)/IM
+                iy=ior(ieor(888889999,abs(idum)),1)
+                ix=ieor(777755555,abs(idum))
+                idum=abs(idum)+1
+        end if
+        ix=ieor(ix,ishft(ix,13))
+        ix=ieor(ix,ishft(ix,-17))
+        ix=ieor(ix,ishft(ix,5))
+        k=iy/IQ
+        iy=IA*(iy-k*IQ)-IR*k
+        if (iy < 0) iy=iy+IM
+        ran=am*ior(iand(IM,ieor(ix,iy)),1)
+
+end function ran
+
 
 real function ran2(idum)
 
@@ -1061,9 +1097,8 @@ subroutine loadi(ns)
   real :: grp,gxdgyp,zoldp
   real :: wx0,wx1,wz0,wz1
 
-  !!number of particle per processor=mm
-  cnt=int((tmm(1)/numprocs)*ntube)
-  !   write(*,*)'in loader cnt, mm(1)=',cnt,mm(1)
+  !!!new definition of tmm(1) (htc)
+  cnt=int(tmm(1)/numprocs)*ntube
 
   myavgv=0.
   avgv=0.
@@ -1072,7 +1107,7 @@ subroutine loadi(ns)
 
   !      ns = 1
   m = 0
-  do j = 1,100000000
+  do j = 1,500000000
 
      !     load a slab of ions...
 
@@ -1088,19 +1123,19 @@ subroutine loadi(ns)
      if(ran2(iseed)<(0.5*jacp/jacmax))then
         m = m+1
         if(m>mm(ns))goto 170
-        x2(ns,m)=min(dumx,lx-1e-8)
-        y2(ns,m)=min(dumy,ly-1e-8)
+        x2(m,ns)=min(dumx,lx-1e-8)
+        y2(m,ns)=min(dumy,ly-1e-8)
 
         k = int((th+pi)/dth)
         wz0 = (-pi+(k+1)*dth-th)/dth
         wz1 = 1-wz0
-        z2(ns,m) = wz0*zfnth(k)+wz1*zfnth(k+1)
-        z2(ns,m)=min(z2(ns,m),lz-1e-8)
+        z2(m,ns) = wz0*zfnth(k)+wz1*zfnth(k+1)
+        z2(m,ns)=min(z2(m,ns),lz-1e-8)
 
         call parperp(vpar,vperp2,m,pi,cnt,MyId)
         !   normalizations will be done in following loop...
 
-        r=x2(ns,m)-0.5*lx+lr0
+        r=x2(m,ns)-0.5*lx+lr0
         cost=cos(th)
         i = int((r-rin)/dr)
         wx0 = (rin+(i+1)*dr-r)/dr
@@ -1115,20 +1150,20 @@ subroutine loadi(ns)
         if(ildu==1)ter = tgis(ns)
         b=1.-tor+tor*bfldp
 
-        u2(ns,m)=vpar/sqrt(mims(ns)/ter)
-        mu(ns,m)=0.5*vperp2/b*ter
-        eki(ns,m) = mu(ns,m)*b+0.5*mims(ns)*u2(ns,m)**2
-        pzi(ns,m) = mims(ns)*u2(ns,m)/b-q(ns)*psp/br0
-        z0i(ns,m) = z2(ns,m)
-        xii(ns,m) = x2(ns,m)
-        u0i(ns,m) = u2(ns,m)
-        myavgv=myavgv+u2(ns,m)
+        u2(m,ns)=vpar/sqrt(mims(ns)/ter)
+        mu(m,ns)=0.5*vperp2/b*ter
+        eki(m,ns) = mu(m,ns)*b+0.5*mims(ns)*u2(m,ns)**2
+        pzi(m,ns) = mims(ns)*u2(m,ns)/b-q(ns)*psp/br0
+        z0i(m,ns) = z2(m,ns)
+        xii(m,ns) = x2(m,ns)
+        u0i(m,ns) = u2(m,ns)
+        myavgv=myavgv+u2(m,ns)
 
-        !    LINEAR: perturb w(ns,m) to get linear growth...
-        !         w2(ns,m)=2.*amp*(revers(MyId*cnt+m,13)-0.5) !(ran2(iseed) - 0.5 )
-        w2(ns,m)=2.*amp*sin(pi2/ly*y2(ns,m))*exp(-(z2(ns,m)-lz/2)**2/(lz/8)**2)*exp(-(x2(ns,m)-0.4*lx)**2/(lx/8)**2)
-        if(ns==2)w2(ns,m) = 0.
-        myavgw=myavgw+w2(ns,m)
+        !    LINEAR: perturb w(m,ns) to get linear growth...
+        !         w2(m,ns)=2.*amp*(revers(MyId*cnt+m,13)-0.5) !(ran2(iseed) - 0.5 )
+        w2(m,ns)=2.*amp*sin(pi2/ly*y2(m,ns))*exp(-(z2(m,ns)-lz/2)**2/(lz/8)**2)*exp(-(x2(m,ns)-0.4*lx)**2/(lx/8)**2)
+        if(ns==2)w2(m,ns) = 0.
+        myavgw=myavgw+w2(m,ns)
      end if
   enddo
 170 continue
@@ -1139,70 +1174,73 @@ subroutine loadi(ns)
        MPI_REAL8, &
        MPI_SUM,MPI_COMM_WORLD,ierr)
   if(idg.eq.1)write(*,*)'all reduce'
-  avgv=avgv/(real(tmm(1))*real(ntube))
+  !change int to real (htc)
+  !avgv=avgv/real(tmm(1))
+  avgv=(avgv/real(tmm(1)))/real(ntube)
+  
   do m=1,mm(ns)
-     u2(ns,m)=u2(ns,m)-avgv
-     x3(ns,m)=x2(ns,m)
-     y3(ns,m)=y2(ns,m)
-     z3(ns,m)=z2(ns,m)
-     u3(ns,m)=u2(ns,m)
-     !         w2(ns,m) = w2(ns,m)-myavgw
-     w3(ns,m)=w2(ns,m)
+     u2(m,ns)=u2(m,ns)-avgv
+     x3(m,ns)=x2(m,ns)
+     y3(m,ns)=y2(m,ns)
+     z3(m,ns)=z2(m,ns)
+     u3(m,ns)=u2(m,ns)
+     !         w2(m,ns) = w2(m,ns)-myavgw
+     w3(m,ns)=w2(m,ns)
   enddo
 
   np_old=mm(ns)
-  call init_pmove(z2(ns,:),np_old,lz,ierr)
+  call init_pmove(z2(:,ns),np_old,lz,ierr)
   if(idg.eq.1)write(*,*)'pass init_pmove'
   !
-  call pmove(x2(ns,:),np_old,np_new,ierr)
+  call pmove(x2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
   !$acc update device(x2)
-  call pmove(x3(ns,:),np_old,np_new,ierr)
+  call pmove(x3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
   !$acc update device(x3)
-  call pmove(y2(ns,:),np_old,np_new,ierr)
+  call pmove(y2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(y2(ns,:))
-  call pmove(y3(ns,:),np_old,np_new,ierr)
+  !$acc update device(y2(:,ns))
+  call pmove(y3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(y3(ns,:))
-  call pmove(z2(ns,:),np_old,np_new,ierr)
+  !$acc update device(y3(:,ns))
+  call pmove(z2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z2(ns,:))
-  call pmove(z3(ns,:),np_old,np_new,ierr)
+  !$acc update device(z2(:,ns))
+  call pmove(z3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z3(ns,:))
-  call pmove(u2(ns,:),np_old,np_new,ierr)
+  !$acc update device(z3(:,ns))
+  call pmove(u2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u2(ns,:))
-  call pmove(u3(ns,:),np_old,np_new,ierr)
+  !$acc update device(u2(:,ns))
+  call pmove(u3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u3(ns,:))
-  call pmove(w2(ns,:),np_old,np_new,ierr)
+  !$acc update device(u3(:,ns))
+  call pmove(w2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(w2(ns,:))
-  call pmove(w3(ns,:),np_old,np_new,ierr)
+  !$acc update device(w2(:,ns))
+  call pmove(w3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(w3(ns,:))
-  call pmove(mu(ns,:),np_old,np_new,ierr)
+  !$acc update device(w3(:,ns))
+  call pmove(mu(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(mu(ns,:))
+  !$acc update device(mu(:,ns))
 
-  call pmove(xii(ns,:),np_old,np_new,ierr)
+  call pmove(xii(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(xii(ns,:))
-  call pmove(z0i(ns,:),np_old,np_new,ierr)
+  !$acc update device(xii(:,ns))
+  call pmove(z0i(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z0i(ns,:))
-  call pmove(pzi(ns,:),np_old,np_new,ierr)
+  !$acc update device(z0i(:,ns))
+  call pmove(pzi(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(pzi(ns,:))
-  call pmove(eki(ns,:),np_old,np_new,ierr)
+  !$acc update device(pzi(:,ns))
+  call pmove(eki(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(eki(ns,:))
-  call pmove(u0i(ns,:),np_old,np_new,ierr)
+  !$acc update device(eki(:,ns))
+  call pmove(u0i(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u0i(ns,:))
+  !$acc update device(u0i(:,ns))
 
   !     
   call end_pmove(ierr)
@@ -1452,8 +1490,7 @@ subroutine initialize
   integer :: n,i,j,k,ip
 
   call ppinit(MyId,numprocs,ntube,TUBE_COMM,GRID_COMM)
-  call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-  write(*,*)'ppinit  id ',myid,numprocs,ntube,TUBE_COMM,GRID_COMM
+  ! write(*,*)'ppinit  ',myid,numprocs,ntube,TUBE_COMM,GRID_COMM
 
   !     program begins....
 
@@ -1465,24 +1502,11 @@ subroutine initialize
   !     read input data and initialize...
 
   call hybinit
-  call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-  write(*,*)'after hybinit: id ',myid
   do i=0,Last
-     call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-     if(myid==0)write(*,*)'before init id 0: ',i
-     if(myid==i)write(*,*)'before init: ',i
      if (MyId.eq.i) call init
-     if(myid==i)write(*,*)'after init 1: ',i
-     if(myid==0)write(*,*)'after init id 0: ',i
      call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-     if(myid==i)write(*,*)'after init 2: ',i
   enddo
-  call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-  if(myid.eq.i)write(*,*)'past init'
-  !write(*,*)'before init: id ',myid
-  !call init
-  !call MPI_BARRIER(MPI_COMM_WORLD,ierr)
-  !write(*,*)'after init: id ',myid
+  if(idg.eq.1)write(*,*)'past init'
 
   dum = 0.
   dum1 = 0.
@@ -1505,7 +1529,8 @@ subroutine initialize
        tube_comm,ierr)
 
   totvol = dx*ly*dz*jacp    
-  n0=(real(tmm(1))*real(ntube))/totvol
+  !!!new tmm(1) definition (htc)
+  n0=(real(tmm(1))/totvol)*real(ntube)
   n0e=mme*numprocs/totvol
   if(myid==0)then
      write(*,*)'totvol,jacp,dum2=',totvol,jacp,dum2
@@ -1712,7 +1737,7 @@ subroutine reporter(n)
   implicit none
   integer :: n,i,j,k,ip
 
-  if(mod(n,xnplt).eq.0) then
+  if(modulo(n,xnplt).eq.0) then
      call spec(n)
   endif
 13 format(1x,i6,7(2x,i7))
@@ -1726,7 +1751,7 @@ subroutine reporter(n)
 
   !     save particle arrays for restart if iput=1...
   !     do this before the code crashes due to graphics problems
-  if((iput.eq.1).and.mod(n+1,500).eq.0)call restart(2,n)
+  if((iput.eq.1).and.modulo(n+1,500).eq.0)call restart(2,n)
 
   !     periodically make output for plots
   call outd(n)
@@ -1812,7 +1837,7 @@ subroutine blendf
      wx0 = (rin+(i+1)*dr-r)/dr
      wx1 = 1.-wx0
      qr = wx0*sf(i)+wx1*sf(i+1)
-     dely(j) = mod(-pi2*lr0/q0*qr*sign(1.0,q0)+8000.*ly,ly)*tor
+     dely(j) = modulo(-pi2*lr0/q0*qr*sign(1.0,q0)+8000.*ly,ly)*tor
   enddo
   do j = 0,jm-1
      if(j.ge.(jm/2+1)) then
@@ -1831,8 +1856,8 @@ subroutine blendf
      do i = 0,imx-1
         do j = 0,jmx-1
            do k = 0,kmx
-              s1 =real(k)*pi2/kmx/dth1-m
-              s2 =real(k)*pi2/kmx/dth1-m-nb
+              s1 = real(k)*pi2/kmx/dth1-m
+              s2 = real(k)*pi2/kmx/dth1-m-nb
               s3 = real(k)*pi2/kmx/dth1-m+nb
               pol(m,i,j,k) = en3(s1)+en3(s2)*pfac(i,j)+en3(s3)/pfac(i,j)
            end do
@@ -2138,10 +2163,11 @@ subroutine ftcamp
      end do
      dum2 = dum2/400
      gam = log(dum2/dum1)/(nsize-400)
-     do i = 0,nsize-1
+     !!!a meaningless loop (htc)
+     !do i = 0,nsize-1
         !         camp(:,i) = camp(:,i)/exp(gam*i)
         !         camp(:,i) = exp(IU*1.5e-3*dt*ifskp*i)*exp(gam*i)  !test FT effect
-     end do
+     !end do
 
      do j = 0,nfreq-1
         om = aomega(j)

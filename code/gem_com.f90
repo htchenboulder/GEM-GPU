@@ -14,11 +14,16 @@ module gem_com
      real function ran2(i)
      end function ran2
 
+     real function ran(i)
+     end function ran
+     
+
      real function en3(s)
        real :: s
      end function en3
   END INTERFACE
 
+  !integer, parameter :: i8 = selected_int_kind(18)
   integer :: imx,jmx,kmx,mmx,mmxe,nmx,nsmx,nsubd=8,&
        modemx,ntube=64,nxpp,ngdx=5,nb=6, &
        negrd=8,nlgrd=8
@@ -39,7 +44,7 @@ module gem_com
           cpush1_start_tm=0,cpush1_end_tm=0,cpush1_tot_tm=0, &
           grid11_start_tm=0,grid11_end_tm=0,ftcamp_start_tm=0,&
           ftcamp_end_tm=0
-  real :: grid11_tot_tm,poisson0_start_tm,poisson0_end_tm,poisson0_tot_tm
+  real :: grid11_tot_tm=0,poisson0_start_tm=0,poisson0_end_tm=0,poisson0_tot_tm=0
   real :: aux1(50000),aux2(20000)
   real,dimension(:),allocatable :: workx,worky,workz
   complex,dimension(:),allocatable :: tmpx
@@ -56,13 +61,14 @@ module gem_com
 
   integer :: mme,mmb
   REAL, dimension(:,:),allocatable :: rwx,rwy
-  !!!tmm is the tmm per tube, i.e., tmm_old(1)=tmm_new(1)*ntube
-  INTEGER,dimension(:),allocatable :: mm,lr,tmm
+  INTEGER,dimension(:),allocatable :: mm,lr
+  INTEGER,dimension(:),allocatable :: tmm
   !$acc declare create(lr)
   REAL,dimension(:),allocatable :: tets,mims,q
   !$acc declare create(mims,q)
   REAL,dimension(:),allocatable :: kapn, kapt
-  INTEGER :: timestep,im,jm,km,mykm,iseed,nrst,nfreq,isft,mynf,ifskp,iphbf,iapbf,idpbf
+  !!!iseed2 used in ran (htc)
+  INTEGER :: timestep,im,jm,km,mykm,iseed,nrst,nfreq,isft,mynf,ifskp,iphbf,iapbf,idpbf,iseed2
   real,dimension(:),allocatable :: time
   REAL :: dx,dy,dz,pi,pi2,dt,dte,totvol,n0,n0e,tcurr,rmpp,rmaa,eprs
   REAL :: lx,ly,lz,xshape,yshape,zshape,pzcrit(5),pzcrite,encrit,tot_field_e,tot_joule,tot_joule1
@@ -125,10 +131,11 @@ module gem_com
   REAL,DIMENSION(:,:),allocatable :: x3,y3,z3,u3
   REAL,DIMENSION(:,:),allocatable :: w2,w3
 
-  !$acc declare create(mu,xii,pzi,eki,z0i,u0i)
-  !$acc declare create(x2,y2,z2,u2)
-  !$acc declare create(x3,y3,z3,u3)
-  !$acc declare create(w2,w3)
+  !!$acc declare create(mu,xii,pzi,eki,z0i,u0i)
+  !!$acc declare create(x2,y2,z2,u2)
+  !!$acc declare create(x3,y3,z3,u3)
+  !!$acc declare create(w2,w3)
+
 
   REAL,DIMENSION(:),allocatable :: mue,xie,pze,eke,z0e,u0e
   REAL,DIMENSION(:),allocatable :: x2e,y2e,z2e,u2e,mue2
@@ -249,11 +256,13 @@ contains
     allocate (gn0e(0:nxpp),gt0e(0:nxpp),gt0i(0:nxpp),avap(0:nxpp))
     allocate (gn0s(1:5,0:nxpp))
     !          particle array declarations
-    allocate( mu(nsmx,1:mmx),xii(nsmx,1:mmx),pzi(nsmx,1:mmx), &
-         eki(nsmx,1:mmx),z0i(nsmx,1:mmx),u0i(nsmx,1:mmx))
-    allocate( x2(nsmx,1:mmx),y2(nsmx,1:mmx),z2(nsmx,1:mmx),u2(nsmx,1:mmx))
-    allocate( x3(nsmx,1:mmx),y3(nsmx,1:mmx),z3(nsmx,1:mmx),u3(nsmx,1:mmx))
-    allocate( w2(nsmx,1:mmx),w3(nsmx,1:mmx))
+    allocate( mu(1:mmx,nsmx),xii(1:mmx,nsmx),pzi(1:mmx,nsmx), &
+         eki(1:mmx,nsmx),z0i(1:mmx,nsmx),u0i(1:mmx,nsmx))
+    allocate( x2(1:mmx,nsmx),y2(1:mmx,nsmx),z2(1:mmx,nsmx),u2(1:mmx,nsmx))
+    allocate( x3(1:mmx,nsmx),y3(1:mmx,nsmx),z3(1:mmx,nsmx),u3(1:mmx,nsmx))
+    allocate( w2(1:mmx,nsmx),w3(1:mmx,nsmx))
+    !$acc enter data create(x2,y2,z2,u2,u3,x3,y3,z3,w2,w3)
+    !$acc enter data create(mu,xii,pzi,eki,z0i,u0i)
 
     allocate( mue(1:mmxe),xie(1:mmxe),pze(1:mmxe),eke(1:mmxe),z0e(1:mmxe),u0e(1:mmxe))
     allocate( x2e(1:mmxe),y2e(1:mmxe),z2e(1:mmxe),u2e(1:mmxe),mue2(1:mmxe))
