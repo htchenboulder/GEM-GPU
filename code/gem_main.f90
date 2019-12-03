@@ -81,11 +81,32 @@ program gem_main
   grid11_tot_tm=grid11_end_tm-grid11_start_tm
   poisson0_tot_tm=poisson0_end_tm-poisson0_start_tm
   exact_total_tm=tottm-poisson0_tot_tm
+  !!!new dignostics(htc)
+  poisson1_tot_tm=poisson_tot_tm-poisson0_tot_tm
+  push_tm=push_tot_tm-cpush1_tot_tm-ppush1_tot_tm
+
+  call MPI_REDUCE(exact_total_tm,total_tm,1,MPI_REAL8,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+  call MPI_REDUCE(push_tm,pmove_tm,1,MPI_REAL8,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+  call MPI_REDUCE(poisson1_tot_tm,poisson_tm,1,MPI_REAL8,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+  call MPI_REDUCE(ppush1_tot_tm,ppush_tm,1,MPI_REAL8,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+  call MPI_REDUCE(cpush1_tot_tm,cpush_tm,1,MPI_REAL8,MPI_SUM,0,MPI_COMM_WORLD,ierr)
+  call MPI_REDUCE(grid11_tot_tm,grid1_tm,1,MPI_REAL8,MPI_SUM,0,MPI_COMM_WORLD,ierr)
   if(myid==0)then
+  total_tm=total_tm/numprocs
+  poisson_tm=poisson_tm/numprocs
+  pmove_tm=pmove_tm/numprocs
+  ppush_tm=ppush_tm/numprocs
+  cpush_tm=cpush_tm/numprocs
+  grid1_tm=grid1_tm/numprocs
+
   write(*,*),'exact_total_tm',exact_total_tm,'tottm',tottm,'accumulate_tot_tm',accumulate_tot_tm,'poisson_tot_tm',poisson_tot_tm,'field_tot_tm',field_tot_tm,&
              'diagnose_tot_tm',diagnose_tot_tm,'reporter_tot_tm',reporter_tot_tm,'push_tot_tm',push_tot_tm, 'ppush_tot_tm',ppush_tot_tm, &
              'cpush_tot_tm',cpush_tot_tm,'gird1_tot_tm',grid1_tot_tm,'ppush1_tot_tm',ppush1_tot_tm,&
               'cpush1_tot_tm',cpush1_tot_tm,'grid11_tot_tm',grid11_tot_tm,'poisson0_tot_tm',poisson0_tot_tm
+
+  write(*,*),'total_tm',total_tm,'ppush_tm',ppush_tm,'cpush_tm',cpush_tm,'grid1_tm',grid1_tm,'pmove_tm',pmove_tm,'poisson_tm',poisson_tm
+
+
   endif
   call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 

@@ -127,6 +127,7 @@ grid11_end_tm=grid11_end_tm+MPI_WTIME()
      call enforce(myden(:,:,:))
      call enforce(myjpar)
      !!!without mydti(htc)
+     !!ion temperature perturbation
      !call enforce(mydti)
      !      call filter(myden(:,:,:))
      !      call filter(myjpar(:,:,:))

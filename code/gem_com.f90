@@ -25,7 +25,7 @@ module gem_com
 
   !integer, parameter :: i8 = selected_int_kind(18)
   integer :: imx,jmx,kmx,mmx,mmxe,nmx,nsmx,nsubd=8,&
-       modemx,ntube=64,nxpp,ngdx=5,nb=6, &
+       modemx,ntube=128,nxpp,ngdx=5,nb=6, &
        negrd=8,nlgrd=8
 
   character(len=70) outname
@@ -45,6 +45,7 @@ module gem_com
           grid11_start_tm=0,grid11_end_tm=0,ftcamp_start_tm=0,&
           ftcamp_end_tm=0
   real :: grid11_tot_tm=0,poisson0_start_tm=0,poisson0_end_tm=0,poisson0_tot_tm=0
+  real :: total_tm=0.0, poisson1_tot_tm=0.0,poisson_tm=0.0,push_tm=0.0,pmove_tm=0.0,ppush_tm=0.0,cpush_tm=0.0,grid1_tm=0.0
   real :: aux1(50000),aux2(20000)
   real,dimension(:),allocatable :: workx,worky,workz
   complex,dimension(:),allocatable :: tmpx
