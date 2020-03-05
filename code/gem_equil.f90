@@ -616,7 +616,8 @@ contains
       do j = 0,ntheta
          jfn(j) = dum/jfn(j)
       end do
-      !!!uniform theta domain (htc)
+      !!!uniform theta domain, if we comment jfn=1  then mmx=1.5*(total particle number)/numprocs will be enough, otherwise mmx need
+      !be larger (htc) 
       jfn = 1.
  300  continue
 

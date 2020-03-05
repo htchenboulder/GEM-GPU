@@ -1210,70 +1210,74 @@ subroutine loadi(ns)
   !avgv=avgv/real(tmm(1))
   avgv=(avgv/real(tmm(1)))/real(ntube)
   
-  
+  !$acc update device(u2,mu,eki,pzi,z0i,xii,u0i,x2,y2,z2,w2)
+  !$acc parallel loop independent present(u2,x2,y2,z2,w2,x3,y3,u3,z3,w3)
   do m=1,mm(ns)
+     !$acc atomic capture
      u2(m,ns)=u2(m,ns)-avgv
      u3(m,ns)=u2(m,ns)
+     !$acc end atomic
      x3(m,ns)=x2(m,ns)
      y3(m,ns)=y2(m,ns)
      z3(m,ns)=z2(m,ns)
      !         w2(m,ns) = w2(m,ns)-myavgw
      w3(m,ns)=w2(m,ns)
   enddo
+  !$acc end parallel
 
   np_old=mm(ns)
-  call init_pmove(z2(:,ns),np_old,lz,ierr)
+  call test_init_pmove(z2(:,ns),np_old,lz,ierr)
   if(idg.eq.1)write(*,*)'pass init_pmove'
   !
-  call pmove(x2(:,ns),np_old,np_new,ierr)
+  call test_pmove(x2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(x2)
-  call pmove(x3(:,ns),np_old,np_new,ierr)
+  !!$acc update device(x2)
+  call test_pmove(x3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(x3)
-  call pmove(y2(:,ns),np_old,np_new,ierr)
+  !!$acc update device(x3)
+  call test_pmove(y2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(y2(:,ns))
-  call pmove(y3(:,ns),np_old,np_new,ierr)
+  !!$acc update device(y2(:,ns))
+  call test_pmove(y3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(y3(:,ns))
-  call pmove(z2(:,ns),np_old,np_new,ierr)
+  !!$acc update device(y3(:,ns))
+  call test_pmove(z2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z2(:,ns))
-  call pmove(z3(:,ns),np_old,np_new,ierr)
+  !!$acc update device(z2(:,ns))
+  call test_pmove(z3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z3(:,ns))
-  call pmove(u2(:,ns),np_old,np_new,ierr)
+  !!$acc update device(z3(:,ns))
+  call test_pmove(u2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u2(:,ns))
-  call pmove(u3(:,ns),np_old,np_new,ierr)
+  !!$acc update device(u2(:,ns))
+  call test_pmove(u3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u3(:,ns))
-  call pmove(w2(:,ns),np_old,np_new,ierr)
+  !!$acc update device(u3(:,ns))
+  call test_pmove(w2(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(w2(:,ns))
-  call pmove(w3(:,ns),np_old,np_new,ierr)
+  !!$acc update device(w2(:,ns))
+  call test_pmove(w3(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(w3(:,ns))
-  call pmove(mu(:,ns),np_old,np_new,ierr)
+  !!$acc update device(w3(:,ns))
+  call test_pmove(mu(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(mu(:,ns))
+  !!$acc update device(mu(:,ns))
 
-  call pmove(xii(:,ns),np_old,np_new,ierr)
+  call test_pmove(xii(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(xii(:,ns))
-  call pmove(z0i(:,ns),np_old,np_new,ierr)
+  !!$acc update device(xii(:,ns))
+  call test_pmove(z0i(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(z0i(:,ns))
-  call pmove(pzi(:,ns),np_old,np_new,ierr)
+  !!$acc update device(z0i(:,ns))
+  call test_pmove(pzi(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(pzi(:,ns))
-  call pmove(eki(:,ns),np_old,np_new,ierr)
+  !!$acc update device(pzi(:,ns))
+  call test_pmove(eki(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(eki(:,ns))
-  call pmove(u0i(:,ns),np_old,np_new,ierr)
+  !!$acc update device(eki(:,ns))
+  call test_pmove(u0i(:,ns),np_old,np_new,ierr)
   if (ierr.ne.0) call ppexit
-  !$acc update device(u0i(:,ns))
+  !!$acc update device(u0i(:,ns))
 
   !     
   call end_pmove(ierr)

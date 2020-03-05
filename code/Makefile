@@ -7,7 +7,7 @@ LIBS = $(DFFTPACK)
 PLIB = gem_pputil.o
 
 #PMOVE_DEBUG_OPT= -D__PMOVE_DEBUG
-F90 = mpifort
+F90 = mpifort 
 OPT = -fast -r8 -Kieee -llapack -lblas -cpp -Minfo=accel -acc -ta=nvidia:cc70 #-Xcompiler -rdynamic -lineinfo
 #OPT = -fast -r8 -Kieee -llapack -lblas -cpp -Minfo=all -acc -ta=nvidia:cc70 #-Xcompiler -rdynamic -lineinfo
 #PURE CPU

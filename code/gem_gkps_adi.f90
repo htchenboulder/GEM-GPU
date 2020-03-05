@@ -14,6 +14,8 @@ subroutine gkps_adiabatic_electron(nstep,ip)
   complex,dimension(:,:,:,:),allocatable :: mx,mx_zonal
 
   ! local variables for matrix implement
+  !!!calculates gamma 0 and gamma 1,  (Abramowitz and Stegun), (htc)
+  real :: t1,t2
   integer :: i,j,k,l,m,n,i1,k1,m1,ns,ix,ikx,icount,INFO
   real :: r,th,wx0,wx1,wz0,wz1,kx1,kx2,ky,gam0,gam1,sgny, &
           bfldp,dydrp,qhatp,grp,gthp,gxdgyp,grdgtp
@@ -60,6 +62,7 @@ subroutine gkps_adiabatic_electron(nstep,ip)
       goto 200
     end if
 
+    !$acc parallel loop
     ! construct the matrix for poisson solver
     do l=0,im-1
        do m=0,jcnt-1
@@ -123,9 +126,35 @@ subroutine gkps_adiabatic_electron(nstep,ip)
                           +2*dydrp*lr0/q0*qhatp*grdgtp) &
                           +2*kx2*ky*gxdgyp)/(bfldp*bfldp)*ter(ns)/(q(ns)*q(ns))
                    ! construct the Gamma(b+) and Gamma(b-)
-                   call srcbes(b1(ns),gam0,gam1)
+                   if (b1(ns).gt.3.75d0) then
+                     t2=1.d0/sqrt(b1(ns))
+                     t1=3.75d0/b1(ns)
+                     gam0=t2*((((((((.00392377d0*t1-.01647633d0)*t1+.02635537d0) &
+                               *t1-.02057706d0)*t1+.00916281d0)*t1-.00157565d0)*t1+ &
+                                .00225319d0)*t1+.01328592d0)*t1+.39894228d0)
+
+                   else
+                     t1=(b1(ns)/3.75d0)**2
+                     t2=exp(-b1(ns))
+                     gam0=t2*((((((.0045813d0*t1+.0360768d0)*t1+.2659732d0)*t1+ &
+                        1.2067492d0)*t1+3.0899424d0)*t1+3.5156229d0)*t1+1.d0)
+                   endif
+                           
                    gamb1(ns,l,m,i,n)=gam0
-                   call srcbes(b2(ns),gam0,gam1)
+
+                   if (b2(ns).gt.3.75d0) then
+                     t2=1.d0/sqrt(b2(ns))
+                     t1=3.75d0/b2(ns)
+                     gam0=t2*((((((((.00392377d0*t1-.01647633d0)*t1+.02635537d0) &
+                               *t1-.02057706d0)*t1+.00916281d0)*t1-.00157565d0)*t1+ &
+                                .00225319d0)*t1+.01328592d0)*t1+.39894228d0)
+
+                   else
+                     t1=(b2(ns)/3.75d0)**2
+                     t2=exp(-b2(ns))
+                     gam0=t2*((((((.0045813d0*t1+.0360768d0)*t1+.2659732d0)*t1+ &
+                        1.2067492d0)*t1+3.0899424d0)*t1+3.5156229d0)*t1+1.d0)
+                   endif
                    gamb2(ns,l,m,i,n)=gam0
                 enddo
 
@@ -138,6 +167,7 @@ subroutine gkps_adiabatic_electron(nstep,ip)
           enddo
        enddo
     enddo
+    !$acc end parallel
     ! construct the matrix MX for Poisson sovler
 !$acc parallel loop gang vector private(ter) collapse(4)
     do k=0,1
