@@ -62,7 +62,7 @@ subroutine gkps_adiabatic_electron(nstep,ip)
       goto 200
     end if
 
-    !$acc parallel loop
+    !!$acc parallel loop independent
     ! construct the matrix for poisson solver
     do l=0,im-1
        do m=0,jcnt-1
@@ -167,7 +167,7 @@ subroutine gkps_adiabatic_electron(nstep,ip)
           enddo
        enddo
     enddo
-    !$acc end parallel
+    !!$acc end parallel
     ! construct the matrix MX for Poisson sovler
 !$acc parallel loop gang vector private(ter) collapse(4)
     do k=0,1
