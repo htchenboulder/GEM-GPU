@@ -3,12 +3,13 @@ SRCS =	gem_com.f90 gem_equil.f90 gem_main.f90 gem_outd.f90 gem_fcnt.f90 gem_fft_
 OBJS =	gem_com.o gem_equil.o gem_main.o gem_outd.o gem_fcnt.o gem_fft_wrapper.o gem_gkps_adi.o ppush.o cpush.o grid1.o 
 
 DFFTPACK=dfftpack/libdfftpack.a
-LIBS = $(DFFTPACK)
+PERFSTUBS=/ccs/home/shirley/GEM-GPU/code/perfstubs/ps_build/lib/libperfstubs.a
+LIBS = $(DFFTPACK) $(PERFSTUBS)
 PLIB = gem_pputil.o
 
 #PMOVE_DEBUG_OPT= -D__PMOVE_DEBUG
 F90 = mpifort 
-OPT = -fast -r8 -Kieee -llapack -lblas -cpp -Minfo=accel -acc -ta=nvidia:cc70 #-Xcompiler -rdynamic -lineinfo
+OPT = -fast -r8 -Kieee -llapack -lblas -cpp -Minfo=accel -acc -ta=nvidia:cc70 -I/ccs/home/shirley/GEM-GPU/code/perfstubs/ps_build/include #-Xcompiler -rdynamic -lineinfo
 #OPT = -fast -r8 -Kieee -llapack -lblas -cpp -Minfo=all -acc -ta=nvidia:cc70 #-Xcompiler -rdynamic -lineinfo
 #PURE CPU
 #OPT = -fast -r8 -Kieee -llapack -lblas -cpp
