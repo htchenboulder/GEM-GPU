@@ -1,4 +1,7 @@
 !   global variables...
+#define PERFSTUBS_USE_TIMERS 1
+#include "perfstubs_api/timer_f.h"
+
 program gem_main
 
   use gem_com
@@ -120,6 +123,8 @@ program gem_main
 
   endif
   call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+
+  PERFSTUBS_FINALIZE()
 
 100 call MPI_FINALIZE(ierr)
 
@@ -1528,6 +1533,7 @@ subroutine initialize
   !     program begins....
 
   !     reset timestep counter.
+  PERFSTUBS_INITIALIZE();
   Last=numprocs-1
   timestep=0
   tcurr = 0.
